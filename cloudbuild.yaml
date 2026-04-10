@@ -1,0 +1,98 @@
+# ============================================================
+# Cloud Build — CALIDAD Document Generator
+# GCP Project: gen-lang-client-0496465292
+# ============================================================
+#
+# Prerequisites (run once — если ещё не настроено):
+#
+#   gcloud config set project gen-lang-client-0496465292
+#
+#   1. Создать репозиторий в Artifact Registry:
+#      gcloud artifacts repositories create calidad \
+#        --repository-format=docker --location=us-central1 \
+#        --project=gen-lang-client-0496465292
+#
+#   2. Сохранить Gemini API ключ в Secret Manager:
+#      gcloud secrets create GEMINI_API_KEY \
+#        --project=gen-lang-client-0496465292
+#      echo -n "ВАШ_КЛЮЧ" | gcloud secrets versions add GEMINI_API_KEY --data-file=-
+#
+#   3. Дать Cloud Build доступ к секрету:
+#      gcloud secrets add-iam-policy-binding GEMINI_API_KEY \
+#        --member="serviceAccount:$(gcloud projects describe gen-lang-client-0496465292 \
+#          --format='value(projectNumber)')@cloudbuild.gserviceaccount.com" \
+#        --role="roles/secretmanager.secretAccessor" \
+#        --project=gen-lang-client-0496465292
+#
+#   4. Дать Cloud Build право деплоить в Cloud Run:
+#      gcloud projects add-iam-policy-binding gen-lang-client-0496465292 \
+#        --member="serviceAccount:$(gcloud projects describe gen-lang-client-0496465292 \
+#          --format='value(projectNumber)')@cloudbuild.gserviceaccount.com" \
+#        --role="roles/run.admin"
+#
+# Запуск деплоя вручную:
+#   gcloud builds submit --config cloudbuild.yaml \
+#     --project=gen-lang-client-0496465292
+#
+# ============================================================
+
+steps:
+  # ── Step 1: Build Docker image ───────────────────────────
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build'
+    args:
+      - 'build'
+      - '--build-arg'
+      - 'GEMINI_API_KEY=$$GEMINI_API_KEY'
+      - '-t'
+      - '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA'
+      - '-t'
+      - '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/$_SERVICE_NAME:latest'
+      - '.'
+    secretEnv: ['GEMINI_API_KEY']
+
+  # ── Step 2: Push to Artifact Registry ────────────────────
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push'
+    args:
+      - 'push'
+      - '--all-tags'
+      - '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/$_SERVICE_NAME'
+
+  # ── Step 3: Deploy to Cloud Run ──────────────────────────
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'deploy'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - '$_SERVICE_NAME'
+      - '--image=$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA'
+      - '--region=$_REGION'
+      - '--platform=managed'
+      - '--allow-unauthenticated'
+      - '--port=8080'
+      - '--memory=512Mi'
+      - '--cpu=1'
+      - '--min-instances=0'
+      - '--max-instances=10'
+
+# ── Secret from Secret Manager ───────────────────────────────
+availableSecrets:
+  secretManager:
+    - versionName: 'projects/$PROJECT_ID/secrets/GEMINI_API_KEY/versions/latest'
+      env: 'GEMINI_API_KEY'
+
+# ── Default substitutions (override via --substitutions flag) ─
+substitutions:
+  _REGION: us-central1
+  _SERVICE_NAME: calidad-generator
+  _REPO_NAME: calidad
+
+# ── Images to store in Artifact Registry ─────────────────────
+images:
+  - '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA'
+  - '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/$_SERVICE_NAME:latest'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
