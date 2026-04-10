@@ -1,0 +1,172 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@600;700;800&display=swap');
+@import "tailwindcss";
+@config "../tailwind.config.js";
+
+@theme {
+  --color-calidad-blue: #0f3c7a;
+  --color-calidad-red: #d9232a;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Montserrat", sans-serif;
+}
+
+@layer base {
+  body {
+    @apply bg-gray-300 text-slate-900 font-sans;
+  }
+}
+
+/* A4 Page Styles */
+.a4-container {
+  @apply flex-1 overflow-y-auto bg-gray-300 min-h-screen overflow-x-hidden;
+}
+
+.a4-page {
+  width: 210mm;
+  min-height: 297mm;
+  padding: 20mm 15mm;
+  margin: 0 auto;
+  background: white;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+  box-sizing: border-box;
+  position: relative;
+  font-family: 'Times New Roman', Times, serif;
+  font-size: 12pt;
+  line-height: 1.4;
+  color: #000;
+  text-align: justify;
+  overflow: hidden;
+}
+
+.a4-page + .a4-page {
+  margin-top: 10mm;
+}
+
+@media print {
+  .a4-page + .a4-page {
+    margin-top: 0;
+  }
+}
+
+.a4-page h1, .a4-page h2, .a4-page h3 {
+  font-family: 'Times New Roman', Times, serif;
+  font-weight: bold;
+  text-align: center;
+  margin-top: 1.5em;
+  margin-bottom: 1em;
+  text-transform: uppercase;
+  line-height: 1.2;
+}
+
+.a4-page h1 { font-size: 14pt; }
+.a4-page h2 { font-size: 12pt; }
+.a4-page h3 { font-size: 12pt; text-align: left; }
+
+.a4-page p {
+  margin-bottom: 0.8em;
+}
+
+.a4-page table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5em 0;
+}
+
+.a4-page th, .a4-page td {
+  border: 1px solid black;
+  padding: 4px 6px;
+  text-align: left;
+  vertical-align: top;
+  font-size: 10pt;
+}
+
+.a4-page th {
+  background-color: #f1f5f9;
+  font-weight: bold;
+  text-align: center;
+}
+
+/* CP Specific Styles */
+.cp-page {
+  font-family: 'Inter', sans-serif;
+  text-align: left;
+}
+
+.cp-page h1, .cp-page h2, .cp-page h3 {
+  font-family: 'Montserrat', sans-serif;
+  text-align: left;
+  text-transform: none;
+}
+
+/* Print Styles */
+@media print {
+  /* Hide UI elements */
+  aside, .no-print, button, .sidebar-controls {
+    display: none !important;
+  }
+
+  /* Reset layout for print */
+  html, body, #root, #root > div {
+    width: 210mm !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    display: block !important;
+    background: white !important;
+  }
+
+  .a4-container {
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 210mm !important;
+    display: block !important;
+  }
+
+  .a4-page {
+    margin: 0 !important;
+    padding: 15mm 20mm !important; /* Standard margins */
+    width: 210mm !important;
+    min-height: 297mm !important;
+    box-shadow: none !important;
+    border: none !important;
+    page-break-after: always !important;
+    background: white !important;
+    position: relative !important;
+  }
+
+  /* Ensure colors are printed */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  @page {
+    size: A4;
+    margin: 0;
+  }
+
+  #preview-scaler {
+    transform: none !important;
+    width: 210mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    display: block !important;
+  }
+}
+
+/* Custom Scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
