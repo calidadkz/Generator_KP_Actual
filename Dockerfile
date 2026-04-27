@@ -1,7 +1,7 @@
 # ============================================================
 # CALIDAD Document Generator — Dockerfile
 # Target: Google Cloud Run (port 8080)
-# Backend (Node.js) on port 3000, Nginx reverse-proxy on 8080
+# Node.js Express server serves both API + static files
 # ============================================================
 
 # ---- Stage 1: Build ----------------------------------------
@@ -17,30 +17,26 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-# ---- Stage 2: Serve ----------------------------------------
+# ---- Stage 2: Runtime ----------------------------------------
 FROM node:20-alpine
 
 WORKDIR /app
 
-# Install nginx for reverse proxy
-RUN apk add --no-cache nginx
-
-# Copy built static files
+# Copy built static files (React SPA)
 COPY --from=builder /app/dist /app/dist
 
-# Copy built server (compiled from TypeScript)
+# Copy built server code (compiled TypeScript)
 COPY --from=builder /app/dist-server /app/dist-server
 
-# Copy nginx config
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Copy runtime dependencies (node_modules)
+# Optimization: install only production dependencies
+COPY --from=builder /app/node_modules /app/node_modules
 
-# Copy startup script
-COPY start.sh /app/start.sh
-RUN chmod +x /app/start.sh
-
-# Cloud Run requires PORT=8080
+# Cloud Run listens on PORT=8080
 ENV PORT=8080
+ENV NODE_ENV=production
 
 EXPOSE 8080
 
-CMD ["/app/start.sh"]
+# Start the server
+CMD ["node", "/app/dist-server/server/index.js"]

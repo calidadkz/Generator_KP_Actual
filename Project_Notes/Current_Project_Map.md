@@ -179,30 +179,30 @@ gcloud run deploy calidad-generator --source . --region asia-east2 \
 
 ### 🔐 Runtime Secrets Architecture (апрель 2026)
 
-**Ключевое изменение:** GEMINI_API_KEY больше НЕ инъектируется на этапе сборки Vite. Вместо этого используется **Runtime Secrets**:
+**Ключевое изменение:** GEMINI_API_KEY больше НЕ инъектируется на этапе сборки Vite. Вместо этого используется **Runtime Secrets** через Express backend:
 
-1. **Фронтенд (React SPA)** — не знает о GEMINI_API_KEY
-   - Вызывает `/api/*` эндпоинты на своем же сервере
-   - Все запросы идут через Nginx reverse-proxy
+**Архитектура:**
+```
+React SPA (browser)
+    ↓ fetch('/api/*')
+Node.js Express (port 8080)
+    ├─ Serves /app/dist (static React build)
+    ├─ Handles /api/* routes
+    │  └─ reads process.env.GEMINI_API_KEY at runtime
+    └─ Calls Gemini API when needed
+```
 
-2. **Бэкенд (Node.js Express)** — читает `process.env.GEMINI_API_KEY` при запуске
-   - Запускается параллельно с Nginx (supervisor)
-   - На порту 3000 (Nginx прокси на 8080)
-   - Функции `cleanDialogueText()`, `analyzeDialogue()`, `extractBatchInsights()` работают в NodeJS
-   - `--set-secrets=GEMINI_API_KEY=...` делает ключ доступным контейнеру при запуске
-
-3. **Nginx** — обслуживает статику + проксирует /api/* на бэкенд
-   - Слушает 8080 (Cloud Run default)
-   - Все пути → index.html (SPA)
-   - /api/* → localhost:3000 (backend)
+**Как это работает:**
+1. `gcloud run deploy ... --set-secrets=GEMINI_API_KEY=...` делает ключ доступным в контейнере при запуске
+2. Node.js читает `process.env.GEMINI_API_KEY` из окружения контейнера
+3. React SPA вызывает `/api/clean-text`, `/api/analyze-dialogue` и т.д.
+4. Express backend обрабатывает запросы и вызывает Gemini API
 
 | Файл | Роль |
 |---|---|
-| `Dockerfile` | Multi-stage: build → Node.js + Nginx (supervisor запускает оба) |
-| `supervisor.conf` | Управляет Nginx + Node.js процессами в одном контейнере |
-| `nginx.conf` | SPA-роутинг + reverse-proxy /api/* на бэкенд |
-| `src/server/index.ts` | Express API: /api/clean-text, /api/analyze-dialogue и т.д. |
-| `src/server/geminiApi.ts` | Бизнес-логика вызовов Gemini API (используется сервером) |
+| `Dockerfile` | Multi-stage: build → Node.js (Express сам служит всё: статику + API) |
+| `src/server/index.ts` | Express сервер (слушает 8080): статика + /api/* routes |
+| `src/server/geminiApi.ts` | Бизнес-логика вызовов Gemini API |
 | `src/services/dialogueProcessor.ts` | Клиентская обёртка: fetch('/api/*') вместо прямых вызовов |
 | `package.json` | `build: "npm run build:client && npm run build:server"` |
 | `tsconfig.server.json` | TypeScript конфиг для компиляции src/server/** в dist-server/ |

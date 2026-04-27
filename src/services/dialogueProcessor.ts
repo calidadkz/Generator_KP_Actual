@@ -1,8 +1,5 @@
 import { BatchInsights, ExtractedDialogueData, ModelLogEntry } from '../types';
 
-// API Base URL - use /api for local dev, or relative path in production
-const API_BASE = typeof window !== 'undefined' ? '' : 'http://localhost:3000';
-
 export interface ProcessResult {
   data: ExtractedDialogueData;
   usedModel: string;
@@ -10,7 +7,7 @@ export interface ProcessResult {
 }
 
 async function apiCall<T>(endpoint: string, method: 'GET' | 'POST' = 'POST', body?: unknown): Promise<T> {
-  const url = `${API_BASE}/api${endpoint}`;
+  const url = `/api${endpoint}`;
   const opts: RequestInit = {
     method,
     headers: { 'Content-Type': 'application/json' },
@@ -20,7 +17,7 @@ async function apiCall<T>(endpoint: string, method: 'GET' | 'POST' = 'POST', bod
   const res = await fetch(url, opts);
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData.error || `API error: ${res.status}`);
+    throw new Error((errorData as { error?: string }).error || `API error: ${res.status}`);
   }
   return res.json();
 }

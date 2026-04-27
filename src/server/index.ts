@@ -1,9 +1,22 @@
 import express, { Request, Response } from 'express';
+import path from 'path';
 import { cleanDialogueText, analyzeDialogue, extractBatchInsights, listAvailableModels } from './geminiApi';
 import { ExtractedDialogueData } from '../types';
 
 const app = express();
 app.use(express.json({ limit: '10mb' }));
+
+// Serve static files from /app/dist (React SPA build output)
+app.use(express.static('/app/dist', {
+  maxAge: '1y',
+  etag: false,
+  setHeaders: (res, path) => {
+    // index.html should never be cached
+    if (path.endsWith('.html')) {
+      res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    }
+  },
+}));
 
 function getApiKey(): string {
   const key = process.env.GEMINI_API_KEY;
@@ -13,6 +26,7 @@ function getApiKey(): string {
   return key;
 }
 
+// API endpoints
 app.post('/api/clean-text', async (req: Request, res: Response) => {
   try {
     const { rawText } = req.body;
@@ -73,8 +87,15 @@ app.get('/health', (req: Request, res: Response) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`[Gemini API Server] Listening on port ${PORT}`);
-  console.log(`GEMINI_API_KEY: ${process.env.GEMINI_API_KEY ? '✓ set' : '✗ NOT SET'}`);
+// SPA fallback: any request that doesn't match an API route or static file → index.html
+app.get('*', (req: Request, res: Response) => {
+  res.sendFile(path.join('/app/dist', 'index.html'));
+});
+
+const PORT = parseInt(process.env.PORT || '8080', 10);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`[CALIDAD Server] Listening on 0.0.0.0:${PORT}`);
+  console.log(`[CALIDAD Server] Static files: /app/dist`);
+  console.log(`[CALIDAD Server] API routes: /api/*`);
+  console.log(`[CALIDAD Server] GEMINI_API_KEY: ${process.env.GEMINI_API_KEY ? '✓ set' : '✗ NOT SET'}`);
 });

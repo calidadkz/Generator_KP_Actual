@@ -4,8 +4,9 @@
       "Bash(npm run *)",
       "Bash(git add *)",
       "Bash(git commit *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(timeout 120 gcloud run deploy calidad-generator --source . --region asia-east2 --allow-unauthenticated --set-secrets=GEMINI_API_KEY=GEMINI_API_KEY:latest --project gen-lang-client-0038297950)",
+      "PowerShell(gcloud run deploy calidad-generator --source . --region asia-east2 --allow-unauthenticated --set-secrets=GEMINI_API_KEY=GEMINI_API_KEY:latest --project gen-lang-client-0038297950 2>&1)"
     ]
   }
 }
-
