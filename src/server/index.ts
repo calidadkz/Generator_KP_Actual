@@ -3,20 +3,30 @@ import path from 'path';
 import { cleanDialogueText, analyzeDialogue, extractBatchInsights, listAvailableModels } from './geminiApi';
 import { ExtractedDialogueData } from '../types';
 
+console.log('[server] Initializing Express app...');
+
 const app = express();
 app.use(express.json({ limit: '10mb' }));
 
+console.log('[server] Setting up static file serving...');
 // Serve static files from /app/dist (React SPA build output)
-app.use(express.static('/app/dist', {
-  maxAge: '1y',
-  etag: false,
-  setHeaders: (res, path) => {
-    // index.html should never be cached
-    if (path.endsWith('.html')) {
-      res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
-    }
-  },
-}));
+// Don't fail if directory doesn't exist - we'll serve the SPA fallback from the * route
+const staticDir = '/app/dist';
+try {
+  app.use(express.static(staticDir, {
+    maxAge: '1y',
+    etag: false,
+    setHeaders: (res, filePath) => {
+      // index.html should never be cached
+      if (filePath.endsWith('.html')) {
+        res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+      }
+    },
+  }));
+  console.log(`[server] ✓ Static files configured from ${staticDir}`);
+} catch (err) {
+  console.error('[server] ✗ Static files setup failed:', err);
+}
 
 function getApiKey(): string {
   const key = process.env.GEMINI_API_KEY;
@@ -93,9 +103,24 @@ app.get('*', (req: Request, res: Response) => {
 });
 
 const PORT = parseInt(process.env.PORT || '8080', 10);
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`[CALIDAD Server] Listening on 0.0.0.0:${PORT}`);
-  console.log(`[CALIDAD Server] Static files: /app/dist`);
-  console.log(`[CALIDAD Server] API routes: /api/*`);
-  console.log(`[CALIDAD Server] GEMINI_API_KEY: ${process.env.GEMINI_API_KEY ? '✓ set' : '✗ NOT SET'}`);
-});
+
+console.log('[server] Starting server initialization...');
+console.log(`[server] PORT: ${PORT}`);
+console.log(`[server] NODE_ENV: ${process.env.NODE_ENV}`);
+
+try {
+  const server = app.listen(PORT, '0.0.0.0', () => {
+    console.log(`[server] ✓✓✓ Server listening on 0.0.0.0:${PORT} ✓✓✓`);
+    console.log(`[server] Static files: /app/dist`);
+    console.log(`[server] API routes: /api/*`);
+    console.log(`[server] GEMINI_API_KEY: ${process.env.GEMINI_API_KEY ? '✓ set' : '✗ NOT SET'}`);
+  });
+
+  server.on('error', (err) => {
+    console.error('[server] Server error:', err);
+    process.exit(1);
+  });
+} catch (err) {
+  console.error('[server] FATAL: Failed to start server:', err);
+  process.exit(1);
+}
