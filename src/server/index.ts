@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 import path from 'path';
-import { cleanDialogueText, analyzeDialogue, extractBatchInsights, listAvailableModels } from './geminiApi';
-import { ExtractedDialogueData } from '../types';
+import { cleanDialogueText, analyzeDialogue, extractBatchInsights, listAvailableModels } from './geminiApi.js';
+import { ExtractedDialogueData } from '../types.js';
 
 console.log('[server] Initializing Express app...');
 

@@ -1,4 +1,4 @@
-import { BatchInsights, ExtractedDialogueData, MicroPresentation, ModelLogEntry } from '../types';
+import { BatchInsights, ExtractedDialogueData, MicroPresentation, ModelLogEntry } from '../types.js';
 
 const PREFERRED_MODELS = [
   'gemini-2.5-flash',
