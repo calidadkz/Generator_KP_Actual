@@ -165,12 +165,23 @@ TemplateMapper.tsx                GeneratorPage.tsx
 
 ## Деплой (корень проекта)
 
+🔒 **DEPLOYMENT LOCK:**
+- **GCP Project:** `gen-lang-client-0038297950` (ONLY!)
+- **Region:** `asia-east2` (Hong Kong) (NO us-central1!)
+- **Cloud Run URL:** https://calidad-generator-225103227035.asia-east2.run.app
+
+**Deploy Command (ONLY THIS):**
+```bash
+gcloud run deploy calidad-generator --source . --region asia-east2 \
+  --allow-unauthenticated --set-secrets=GEMINI_API_KEY=GEMINI_API_KEY:latest \
+  --project gen-lang-client-0038297950
+```
+
 | Файл | Роль |
 |---|---|
-| `Dockerfile` | Multi-stage: Node build → Nginx static serve |
+| `Dockerfile` | Multi-stage: Node build → Nginx static serve (GEMINI_API_KEY в npm run build) |
 | `nginx.conf` | SPA-роутинг (все пути → index.html) |
-| `cloudbuild.yaml` | Google Cloud Build pipeline: build image → push → deploy Cloud Run |
-| `vite.config.ts` | Vite конфиг (React plugin, aliases) |
+| `vite.config.ts` | Vite конфиг (React plugin, aliases, GEMINI_API_KEY inject) |
 | `tailwind.config.js` | Tailwind конфиг (цвета calidad-blue/red) |
 | `tsconfig.json` | TypeScript конфиг (strict, paths) |
 
@@ -185,12 +196,78 @@ TemplateMapper.tsx                GeneratorPage.tsx
 
 ---
 
+## Модуль Sales (новое)
+
+Инструмент для управления скриптом звонков и AI-анализом диалогов клиентов.
+
+### Компоненты
+
+| Компонент | Роль | Пользователь |
+|---|---|---|
+| **ManagerCockpit** | Real-time скрипт во время звонка: этапы + мини-презентации (отфильтрованные по категории этапа) | Менеджер |
+| **AdminPanel** | 4 вкладки для администратора: Диалоги / Скрипт / Мини-презентации / Типы станков | Администратор |
+| **AdminDialogues** | Загрузка расшифровок → авто-очистка Gemini → AI-анализ структуры → извлечение закономерностей | Администратор |
+| **AdminScript** | Редактор этапов скрипта (добавить категорию: Открытие/Квалификация/Возражения/Закрытие) | Администратор |
+| **AdminMicroPresentations** | Библиотека мини-презентаций (pitch snippets) с категориями и тегами | Администратор |
+| **AdminMachineTypes** | Каталог типов станков (лазер, фрезер ЧПУ, плазма и т.д.) с квалификаторами | Администратор |
+
+### Хранилище данных
+
+| Сущность | Хранилище | Примечание |
+|---|---|---|
+| ScriptNode | Zustand + localStorage | order, category, title, content, tips, microPresentationIds |
+| MicroPresentation | Zustand + localStorage | title, content, category, tags, machineTypeIds |
+| DialogueRecord | Zustand + IndexedDB (texts) | cleanStatus, analysisStatus, isClean, extractedData |
+| BatchInsights | Zustand + localStorage | patterns от 5+ диалогов (портреты, техники, формулировки) |
+
+### Сервисы
+
+| Файл | Функция |
+|---|---|
+| `dialogueProcessor.ts` | Gemini API: `cleanDialogueText()` → `analyzeDialogue()` → `extractBatchInsights()` |
+| `dialogueStorage.ts` | IndexedDB: `saveDialogueTexts({rawText, cleanedText})` → ref |
+| `useSalesStore.ts` | Zustand store для всего Sales state |
+
+### Ключевые фичи (апрель 2026)
+
+✅ ManagerCockpit: умная фильтрация МП по категории этапа + переходные на следующий  
+✅ AdminDialogues: дедупликация кнопок (flash "Уже есть")  
+✅ AdminDialogues: защита от дублей при загрузке файла  
+✅ AdminDialogues: inline-редактор очищенного текста + Авто-правка ИИ  
+✅ AdminDialogues: скачивание отредактированного диалога как .txt  
+✅ AdminDialogues: пометка "Чистовой" (ShieldCheck)  
+✅ AdminDialogues: привязка диалога к типам станков (chips)  
+✅ AdminDialogues: группировка по типу станка (список/группы)  
+✅ AdminScript: выбор категории этапа  
+
+### Firebase roadmap (следующий этап)
+
+-### 🗄️ Database Infrastructure (Google Cloud)
+- **Project ID:** "gen-lang-client-0038297950",
+- **Database ID:** `databasekp`
+- **Location:** `asia-east2` (Hong Kong)
+- **Edition:** Standard (Firestore Native Mode)
+- **Security Rules:** Open (Test Mode — до 28 мая 2026)
+- **Target Collection:** `processed_scripts`
+const firebaseConfig = {
+  apiKey: "AIzaSyBaBRu2gm_UM49VDVQ0Q2EYN9k-2N4uXUo",
+  authDomain: "gen-lang-client-0038297950.firebaseapp.com",
+  projectId: "gen-lang-client-0038297950",
+  storageBucket: "gen-lang-client-0038297950.firebasestorage.app",
+  messagingSenderId: "225103227035",
+  appId: "1:225103227035:web:0020220f53c8ca15ac3e3e"
+};
+---
+
 ## Идеи и концепции (добавляй сюда)
 
 <!-- Используй этот раздел как буфер идей. Клод будет их учитывать. -->
 
-- [ ] ...
+- [x] Обновляй описание проекта после каждого изменения
+- [ ] Firebase интеграция (Firestore + Storage для диалогов)
+- [ ] ERP-интеграция через useDocumentStore (пока зарезервирован)
+- [ ] Экспорт/импорт диалогов как ZIP архив (как fallback до Firebase)
 
 ---
 
-*Обновлено: апрель 2026*
+*Обновлено: апрель 27, 2026 — добавлена Sales архитектура и Firebase roadmap*
