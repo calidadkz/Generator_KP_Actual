@@ -139,6 +139,7 @@ export interface ScriptNode {
   order: number;
   title: string;
   content: string;
+  category?: string;
   tips?: string[];
   machineTypeIds?: string[];
   microPresentationIds?: string[];
@@ -171,6 +172,8 @@ export interface DialogueRecord {
 
   clientType?: string;
   machineTypeHint?: string;
+  machineTypeIds?: string[];  // manual tagging by operator
+  isClean?: boolean;          // manually marked as final clean version
   extractedData?: ExtractedDialogueData;
 
   errorMessage?: string;

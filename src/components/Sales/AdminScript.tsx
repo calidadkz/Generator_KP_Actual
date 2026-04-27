@@ -7,6 +7,8 @@ function newId() {
   return 'step-' + Date.now().toString(36);
 }
 
+const SCRIPT_CATEGORIES = ['Открытие', 'Квалификация', 'Возражения', 'Закрытие', 'Общее'];
+
 const CATEGORY_COLORS: Record<string, string> = {
   'Открытие':      'bg-green-100 text-green-700',
   'Квалификация':  'bg-blue-100 text-blue-700',
@@ -171,6 +173,30 @@ export const AdminScript: React.FC = () => {
           {expanded[node.id] && (
             <div className="px-4 pb-4 space-y-4 border-t border-gray-100">
               <div className="pt-3">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">
+                  Категория этапа
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {SCRIPT_CATEGORIES.map((cat) => {
+                    const active = node.category === cat;
+                    const color = CATEGORY_COLORS[cat] ?? 'bg-gray-100 text-gray-600';
+                    return (
+                      <button
+                        key={cat}
+                        onClick={() => updateScriptNode(node.id, { category: active ? undefined : cat })}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors border ${
+                          active
+                            ? color + ' ring-2 ring-offset-1 ring-current'
+                            : 'bg-gray-50 text-gray-400 border-gray-200 hover:bg-gray-100'
+                        }`}
+                      >
+                        {cat}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div>
                 <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">
                   Текст скрипта / подсказки менеджеру
                 </label>

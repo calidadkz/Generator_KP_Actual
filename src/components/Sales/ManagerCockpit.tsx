@@ -34,19 +34,34 @@ export const ManagerCockpit: React.FC<ManagerCockpitProps> = ({ onBack }) => {
 
   const currentStep = currentStepId ? sorted.find((n) => n.id === currentStepId) ?? null : null;
 
+  const ALWAYS_SHOWN_CATEGORIES = new Set(['Общее', 'Формулировки']);
+
+  const matchesMachineType = (mp: MicroPresentation) =>
+    !selectedMachineTypeId || !mp.machineTypeIds?.length || mp.machineTypeIds.includes(selectedMachineTypeId);
+
   const relevantMps = (step: ScriptNode | null): MicroPresentation[] => {
+    // No step selected — show only neutral categories
     if (!step) {
       return microPresentations.filter(
-        (mp) => !selectedMachineTypeId || !mp.machineTypeIds?.length || mp.machineTypeIds.includes(selectedMachineTypeId),
+        (mp) => ALWAYS_SHOWN_CATEGORIES.has(mp.category) && matchesMachineType(mp),
       );
     }
+
+    // Step has explicit MP links — show only those
     const linked = step.microPresentationIds ?? [];
-    const direct = microPresentations.filter((mp) => linked.includes(mp.id));
-    if (direct.length > 0) return direct;
-    // Fallback: same category, filtered by machine type
+    if (linked.length > 0) {
+      return microPresentations.filter((mp) => linked.includes(mp.id) && matchesMachineType(mp));
+    }
+
+    // Derive next step category for transitional MPs
+    const currentIdx = sorted.findIndex((n) => n.id === step.id);
+    const nextStep = currentIdx >= 0 ? sorted[currentIdx + 1] : null;
+    const relevantCategories = new Set<string>(ALWAYS_SHOWN_CATEGORIES);
+    if (step.category) relevantCategories.add(step.category);
+    if (nextStep?.category) relevantCategories.add(nextStep.category);
+
     return microPresentations.filter(
-      (mp) =>
-        (!selectedMachineTypeId || !mp.machineTypeIds?.length || mp.machineTypeIds.includes(selectedMachineTypeId)),
+      (mp) => relevantCategories.has(mp.category) && matchesMachineType(mp),
     );
   };
 
