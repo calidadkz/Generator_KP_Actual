@@ -23,7 +23,7 @@ FROM node:20-alpine
 WORKDIR /app
 
 # Install nginx for reverse proxy
-RUN apk add --no-cache nginx supervisor
+RUN apk add --no-cache nginx
 
 # Copy built static files
 COPY --from=builder /app/dist /app/dist
@@ -34,12 +34,13 @@ COPY --from=builder /app/dist-server /app/dist-server
 # Copy nginx config
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Copy supervisor config
-COPY supervisor.conf /etc/supervisor/conf.d/supervisor.conf
+# Copy startup script
+COPY start.sh /app/start.sh
+RUN chmod +x /app/start.sh
 
-# GEMINI_API_KEY comes from --set-secrets at runtime
-ENV PORT=3000
+# Cloud Run requires PORT=8080
+ENV PORT=8080
 
 EXPOSE 8080
 
-CMD ["supervisord", "-c", "/etc/supervisor/conf.d/supervisor.conf"]
+CMD ["/app/start.sh"]
