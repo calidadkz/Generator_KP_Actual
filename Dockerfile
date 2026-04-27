@@ -11,15 +11,14 @@ WORKDIR /app
 # GEMINI_API_KEY is baked into the JS bundle by Vite at build time.
 # Pass it via --build-arg in Cloud Build (sourced from Secret Manager).
 ARG GEMINI_API_KEY
-ENV GEMINI_API_KEY=$GEMINI_API_KEY
 
 # Install dependencies first (layer cache)
 COPY package*.json ./
 RUN npm ci
 
-# Copy source and build
+# Copy source and build WITH GEMINI_API_KEY in environment
 COPY . .
-RUN npm run build
+RUN GEMINI_API_KEY=$GEMINI_API_KEY npm run build
 
 # ---- Stage 2: Serve ----------------------------------------
 FROM nginx:alpine AS runner
