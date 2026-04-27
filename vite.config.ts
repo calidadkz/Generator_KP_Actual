@@ -1,19 +1,11 @@
 import react from '@vitejs/plugin-react';
 import path from 'path';
-import {defineConfig, loadEnv} from 'vite';
+import {defineConfig} from 'vite';
 
-export default defineConfig(({mode}) => {
-  const env = loadEnv(mode, '.', '');
-  // Accept VITE_GEMINI_API_KEY from .env (local dev)
-  // OR GEMINI_API_KEY from process.env (Docker build-arg / Cloud Build)
-  const geminiKey = env.VITE_GEMINI_API_KEY ?? process.env.GEMINI_API_KEY ?? '';
+export default defineConfig(() => {
   return {
     plugins: [react()],
-    define: {
-      'process.env.GEMINI_API_KEY': JSON.stringify(geminiKey),
-      // Single injected constant readable from app code without TypeScript process issues
-      '__GEMINI_KEY__': JSON.stringify(geminiKey),
-    },
+    define: {},
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

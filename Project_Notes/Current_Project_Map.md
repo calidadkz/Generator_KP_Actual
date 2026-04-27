@@ -177,11 +177,36 @@ gcloud run deploy calidad-generator --source . --region asia-east2 \
   --project gen-lang-client-0038297950
 ```
 
+### 🔐 Runtime Secrets Architecture (апрель 2026)
+
+**Ключевое изменение:** GEMINI_API_KEY больше НЕ инъектируется на этапе сборки Vite. Вместо этого используется **Runtime Secrets**:
+
+1. **Фронтенд (React SPA)** — не знает о GEMINI_API_KEY
+   - Вызывает `/api/*` эндпоинты на своем же сервере
+   - Все запросы идут через Nginx reverse-proxy
+
+2. **Бэкенд (Node.js Express)** — читает `process.env.GEMINI_API_KEY` при запуске
+   - Запускается параллельно с Nginx (supervisor)
+   - На порту 3000 (Nginx прокси на 8080)
+   - Функции `cleanDialogueText()`, `analyzeDialogue()`, `extractBatchInsights()` работают в NodeJS
+   - `--set-secrets=GEMINI_API_KEY=...` делает ключ доступным контейнеру при запуске
+
+3. **Nginx** — обслуживает статику + проксирует /api/* на бэкенд
+   - Слушает 8080 (Cloud Run default)
+   - Все пути → index.html (SPA)
+   - /api/* → localhost:3000 (backend)
+
 | Файл | Роль |
 |---|---|
-| `Dockerfile` | Multi-stage: Node build → Nginx static serve (GEMINI_API_KEY в npm run build) |
-| `nginx.conf` | SPA-роутинг (все пути → index.html) |
-| `vite.config.ts` | Vite конфиг (React plugin, aliases, GEMINI_API_KEY inject) |
+| `Dockerfile` | Multi-stage: build → Node.js + Nginx (supervisor запускает оба) |
+| `supervisor.conf` | Управляет Nginx + Node.js процессами в одном контейнере |
+| `nginx.conf` | SPA-роутинг + reverse-proxy /api/* на бэкенд |
+| `src/server/index.ts` | Express API: /api/clean-text, /api/analyze-dialogue и т.д. |
+| `src/server/geminiApi.ts` | Бизнес-логика вызовов Gemini API (используется сервером) |
+| `src/services/dialogueProcessor.ts` | Клиентская обёртка: fetch('/api/*') вместо прямых вызовов |
+| `package.json` | `build: "npm run build:client && npm run build:server"` |
+| `tsconfig.server.json` | TypeScript конфиг для компиляции src/server/** в dist-server/ |
+| `vite.config.ts` | Vite конфиг (React plugin, aliases, без GEMINI_API_KEY) |
 | `tailwind.config.js` | Tailwind конфиг (цвета calidad-blue/red) |
 | `tsconfig.json` | TypeScript конфиг (strict, paths) |
 

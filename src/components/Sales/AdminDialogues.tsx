@@ -6,6 +6,7 @@ import {
   ShieldCheck, LayoutGrid, List,
 } from 'lucide-react';
 import { useSalesStore } from '../../store/useSalesStore';
+import { useCloudSync } from '../../hooks/useCloudSync';
 import {
   analyzeDialogue,
   cleanDialogueText,
@@ -283,6 +284,9 @@ export const AdminDialogues: React.FC = () => {
     machineTypes,
   } = useSalesStore();
 
+  // Initialize cloud sync
+  const { pushDialogueToCloud, syncDialogueUpdate, deleteDialogueFromCloud } = useCloudSync();
+
   const fileRef = useRef<HTMLInputElement>(null);
   const [expandedClean, setExpandedClean] = useState<Record<string, boolean>>({});
   const [expandedAnalysis, setExpandedAnalysis] = useState<Record<string, boolean>>({});
@@ -367,7 +371,17 @@ export const AdminDialogues: React.FC = () => {
     try {
       const cleanedText = await cleanDialogueText(rawText);
       await updateDialogueTexts(ref, { rawText, cleanedText });
-      updateDialogue(id, { cleanStatus: 'ready' });
+      const updated = { cleanStatus: 'ready' as const };
+      updateDialogue(id, updated);
+      // Sync to cloud after cleaning completes
+      const dialogue = useSalesStore.getState().dialogues.find((d) => d.id === id);
+      if (dialogue) {
+        try {
+          await pushDialogueToCloud(dialogue);
+        } catch (cloudErr) {
+          console.error('Failed to push dialogue to cloud:', cloudErr);
+        }
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       updateDialogue(id, { cleanStatus: 'error', cleanErrorMessage: msg });
@@ -573,6 +587,29 @@ export const AdminDialogues: React.FC = () => {
     setLoadedTexts((prev) => { const n = { ...prev }; delete n[d.id]; return n; });
   };
 
+  // ── Cloud sync helpers ──────────────────────────────────────────────────────
+
+  const handleDelete = async (dialogueId: string) => {
+    deleteDialogue(dialogueId);
+    try {
+      await deleteDialogueFromCloud(dialogueId);
+    } catch (err) {
+      console.error('Failed to delete from cloud:', err);
+    }
+  };
+
+  const handleMachineTypeToggle = async (d: DialogueRecord, machineTypeId: string) => {
+    const cur = d.machineTypeIds ?? [];
+    const linked = cur.includes(machineTypeId);
+    const newIds = linked ? cur.filter((x) => x !== machineTypeId) : [...cur, machineTypeId];
+    updateDialogue(d.id, { machineTypeIds: newIds });
+    try {
+      await syncDialogueUpdate(d.id, { machineTypeIds: newIds });
+    } catch (err) {
+      console.error('Failed to sync machine type update:', err);
+    }
+  };
+
   // ── Download ─────────────────────────────────────────────────────────────────
 
   const handleDownload = async (d: DialogueRecord) => {
@@ -739,7 +776,7 @@ export const AdminDialogues: React.FC = () => {
                 </button>
               )}
               <button
-                onClick={() => deleteDialogue(d.id)}
+                onClick={() => handleDelete(d.id)}
                 className="p-1.5 text-gray-300 hover:text-red-500 transition-colors"
               >
                 <Trash2 size={14} />
@@ -754,12 +791,7 @@ export const AdminDialogues: React.FC = () => {
               return (
                 <button
                   key={mt.id}
-                  onClick={() => {
-                    const cur = d.machineTypeIds ?? [];
-                    updateDialogue(d.id, {
-                      machineTypeIds: linked ? cur.filter((x) => x !== mt.id) : [...cur, mt.id],
-                    });
-                  }}
+                  onClick={() => handleMachineTypeToggle(d, mt.id)}
                   className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition-colors ${
                     linked
                       ? 'bg-calidad-blue text-white'

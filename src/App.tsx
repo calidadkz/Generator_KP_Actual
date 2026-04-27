@@ -8,6 +8,7 @@ import { TemplateControls } from './components/UI/TemplateControls';
 import { useContract } from './hooks/useContract';
 import { useSettings } from './context/SettingsContext';
 import { useTemplates } from './hooks/useTemplates';
+import { useCloudSync } from './hooks/useCloudSync';
 import { renderTemplate } from './services/templateService';
 import { Stamp } from './components/UI/Stamp';
 
@@ -78,6 +79,9 @@ export default function App() {
     updateTemplateField,
     resetTemplates,
   } = useTemplates(activeTab);
+
+  // Initialize cloud sync for Sales module at app startup
+  useCloudSync();
 
   const [expandedBlocks, setExpandedBlocks] = useState<Record<string, boolean>>({
     doc: true,
