@@ -1,15 +1,15 @@
-import { Template, CompanyDetails, ContractState, CPState } from '../types';
+import { Template, CompanyDetails, ContractState } from '../types';
 import { formatCurrency, formatDate } from '../utils';
 
 export const renderTemplate = (
-  content: string, 
-  supplier: CompanyDetails, 
-  contract: ContractState, 
-  cp: CPState, 
+  content: string,
+  supplier: CompanyDetails,
+  contract: ContractState,
+  _cp: unknown,
   activeTab: string,
   totalAmount: number,
   totalAmountWords: string,
-  activeTemplate?: Template
+  activeTemplate?: Template,
 ) => {
   let html = content;
 
@@ -47,19 +47,6 @@ export const renderTemplate = (
       'buyer.email': contract.buyer.email,
       'totalAmount': formatCurrency(totalAmount),
       'totalAmountWords': totalAmountWords,
-    });
-  } else if (activeTab === 'cp') {
-    Object.assign(variables, {
-      'clientName': cp.clientName,
-      'kpDate': formatDate(cp.date),
-      'modelName': cp.model,
-      'workingArea': cp.workingArea,
-      'laserPower': cp.power,
-      'priceM2': formatCurrency(cp.prices.m2),
-      'priceRuida': formatCurrency(cp.prices.ruida),
-      'deliveryTime': cp.deliveryTime,
-      'managerName': cp.managerName,
-      'managerPhone': cp.managerPhone,
     });
   }
 

@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Template, AppTab, CPTemplate, TemplateField } from '../types';
+import { useState, useEffect, useMemo } from 'react';
+import { Template, AppTab, TemplateField } from '../types';
 import { DEFAULT_TEMPLATES } from '../constants';
 
 export const useTemplates = (activeTab: AppTab) => {
@@ -8,19 +8,9 @@ export const useTemplates = (activeTab: AppTab) => {
     return saved ? JSON.parse(saved) : DEFAULT_TEMPLATES;
   });
 
-  const [cpTemplates, setCpTemplates] = useState<CPTemplate[]>(() => {
-    const saved = localStorage.getItem('calidad_cp_templates');
-    return saved ? JSON.parse(saved) : [];
-  });
-
   const [activeTemplateId, setActiveTemplateId] = useState<string>(() => {
     const saved = localStorage.getItem('calidad_active_template_id');
     return saved || (DEFAULT_TEMPLATES[0]?.id || '');
-  });
-
-  const [activeCPTemplateId, setActiveCPTemplateId] = useState<string>(() => {
-    const saved = localStorage.getItem('calidad_active_cp_template_id');
-    return saved || '';
   });
 
   const [isAdvancedMode, setIsAdvancedMode] = useState(false);
@@ -30,24 +20,12 @@ export const useTemplates = (activeTab: AppTab) => {
   }, [templates]);
 
   useEffect(() => {
-    localStorage.setItem('calidad_cp_templates', JSON.stringify(cpTemplates));
-  }, [cpTemplates]);
-
-  useEffect(() => {
     localStorage.setItem('calidad_active_template_id', activeTemplateId);
   }, [activeTemplateId]);
-
-  useEffect(() => {
-    localStorage.setItem('calidad_active_cp_template_id', activeCPTemplateId);
-  }, [activeCPTemplateId]);
 
   const activeTemplate = useMemo(() => {
     return templates.find(t => t.id === activeTemplateId);
   }, [templates, activeTemplateId]);
-
-  const activeCPTemplate = useMemo(() => {
-    return cpTemplates.find(t => t.id === activeCPTemplateId);
-  }, [cpTemplates, activeCPTemplateId]);
 
   const handleDocxUpload = async (file: File) => {
     const mammoth = await import('mammoth');
@@ -88,17 +66,6 @@ export const useTemplates = (activeTab: AppTab) => {
       return [...prev, template];
     });
     setActiveTemplateId(template.id);
-  };
-
-  const saveCPTemplate = (template: CPTemplate) => {
-    setCpTemplates(prev => {
-      const exists = prev.find(t => t.id === template.id);
-      if (exists) {
-        return prev.map(t => t.id === template.id ? template : t);
-      }
-      return [...prev, template];
-    });
-    setActiveCPTemplateId(template.id);
   };
 
   const extractVariable = () => {
@@ -164,20 +131,15 @@ export const useTemplates = (activeTab: AppTab) => {
 
   return {
     templates,
-    cpTemplates,
     activeTemplateId,
-    activeCPTemplateId,
     setActiveTemplateId,
-    setActiveCPTemplateId,
     activeTemplate,
-    activeCPTemplate,
     isAdvancedMode,
     setIsAdvancedMode,
     handleDocxUpload,
     extractVariable,
     saveTemplate,
     saveActiveTemplateChanges,
-    saveCPTemplate,
     deleteTemplate,
     updateTemplateField,
     resetTemplates

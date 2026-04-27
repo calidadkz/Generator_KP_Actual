@@ -1,4 +1,4 @@
-import { Template, Company, CPTemplate } from "./types";
+import { Template, Company } from "./types";
 
 export const BRAND_NAME = 'CALIDAD';
 
@@ -91,66 +91,6 @@ export const DEFAULT_TEMPLATES: Template[] = [
       { id: 'clientAddress', label: 'Адрес Заказчика', type: 'textarea', defaultValue: 'г. Алматы, ул. Абая 1', section: '1. РЕКВИЗИТЫ СТОРОН' },
       { id: 'totalAmount', label: 'Сумма договора (₸)', type: 'text', defaultValue: '1 000 000', section: '2. ФИНАНСОВЫЕ УСЛОВИЯ' },
       { id: 'prepaymentDays', label: 'Срок оплаты (дней)', type: 'number', defaultValue: '3', section: '2. ФИНАНСОВЫЕ УСЛОВИЯ' },
-    ]
-  }
-];
-
-export const DEFAULT_CP_TEMPLATES: CPTemplate[] = [
-  {
-    id: 'modular-standard',
-    name: 'Стандартное модульное КП',
-    blocks: [
-      {
-        id: 'b1',
-        blockId: 'cover',
-        data: {
-          title: 'Коммерческое предложение',
-          subtitle: 'на поставку лазерного оборудования',
-          clientName: 'Уважаемый клиент'
-        }
-      },
-      {
-        id: 'b2',
-        blockId: 'intro',
-        data: {
-          managerName: 'Евгений Хурашвили',
-          introText: 'Компания CALIDAD является лидером в поставке лазерного оборудования в Казахстане. Мы предлагаем только проверенные решения для вашего бизнеса.'
-        }
-      },
-      {
-        id: 'b3',
-        blockId: 'specs',
-        data: {
-          modelName: 'CLD 1060',
-          workingArea: '1000 x 600 мм',
-          laserPower: '90-100 Вт',
-          cooling: 'Водяное (чиллер)',
-          motors: 'Шаговые Leadshine'
-        }
-      },
-      {
-        id: 'b4',
-        blockId: 'pricing',
-        data: {
-          priceM2: '1 084 000 ₸',
-          priceRuida: '1 298 000 ₸',
-          deliveryTime: 'В наличии'
-        }
-      },
-      {
-        id: 'b5',
-        blockId: 'media',
-        data: {
-          videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
-        }
-      },
-      {
-        id: 'b6',
-        blockId: 'cta',
-        data: {
-          managerPhone: '+7 707 920 28 20'
-        }
-      }
     ]
   }
 ];

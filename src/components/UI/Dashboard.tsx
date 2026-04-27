@@ -1,13 +1,14 @@
 import React from 'react';
-import { 
-  FileText, 
-  Briefcase, 
-  Settings, 
-  Plus, 
-  Layout as LayoutIcon, 
+import {
+  FileText,
+  Briefcase,
+  Settings,
   FileCode,
   ArrowRight,
-  History
+  History,
+  MapPin,
+  Headphones,
+  BookOpen,
 } from 'lucide-react';
 import { AppTab } from '../../types';
 import { motion } from 'framer-motion';
@@ -19,12 +20,12 @@ interface DashboardProps {
 export const Dashboard: React.FC<DashboardProps> = ({ onSetActiveTab }) => {
   const actions = [
     {
-      id: 'cp',
-      title: 'Коммерческое предложение',
-      description: 'Создать новое КП на основе блоков',
+      id: 'kp-generator',
+      title: 'Генератор КП',
+      description: 'Создать коммерческое предложение на основе PDF-шаблона',
       icon: Briefcase,
       color: 'bg-blue-500',
-      tab: 'cp' as AppTab
+      tab: 'kp-generator' as AppTab,
     },
     {
       id: 'contract',
@@ -32,15 +33,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSetActiveTab }) => {
       description: 'Создать новый договор по шаблону',
       icon: FileText,
       color: 'bg-red-500',
-      tab: 'contract' as AppTab
+      tab: 'contract' as AppTab,
     },
     {
-      id: 'cp-builder',
-      title: 'Конструктор КП',
-      description: 'Создать новый шаблон КП из блоков',
-      icon: LayoutIcon,
+      id: 'template-mapper',
+      title: 'Конструктор шаблонов КП',
+      description: 'Загрузить PDF-подложку и разметить поля для подстановки',
+      icon: MapPin,
       color: 'bg-purple-500',
-      tab: 'cp-builder' as AppTab
+      tab: 'template-mapper' as AppTab,
     },
     {
       id: 'contract-builder',
@@ -48,7 +49,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSetActiveTab }) => {
       description: 'Загрузить .docx и настроить переменные',
       icon: FileCode,
       color: 'bg-orange-500',
-      tab: 'contract-builder' as AppTab
+      tab: 'contract-builder' as AppTab,
     },
     {
       id: 'settings',
@@ -56,16 +57,32 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSetActiveTab }) => {
       description: 'Реквизиты, печать, подпись',
       icon: Settings,
       color: 'bg-gray-500',
-      tab: 'settings' as AppTab
+      tab: 'settings' as AppTab,
     },
     {
       id: 'templates-library',
       title: 'Библиотека шаблонов',
-      description: 'Управление всеми шаблонами КП и договоров',
+      description: 'Управление шаблонами договоров',
       icon: History,
       color: 'bg-blue-600',
-      tab: 'templates-library' as AppTab
-    }
+      tab: 'templates-library' as AppTab,
+    },
+    {
+      id: 'sales-cockpit',
+      title: 'Cockpit менеджера',
+      description: 'Динамический скрипт и мини-презентации в режиме реального звонка',
+      icon: Headphones,
+      color: 'bg-teal-600',
+      tab: 'sales-cockpit' as AppTab,
+    },
+    {
+      id: 'sales-admin',
+      title: 'Управление скриптом',
+      description: 'Загрузка диалогов, AI-анализ, редактор скрипта и базы знаний',
+      icon: BookOpen,
+      color: 'bg-indigo-600',
+      tab: 'sales-admin' as AppTab,
+    },
   ];
 
   return (

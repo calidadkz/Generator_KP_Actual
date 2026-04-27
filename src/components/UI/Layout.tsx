@@ -1,11 +1,10 @@
 import React, { useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AppTab } from '../../types';
-import { 
-  FileText, 
-  Briefcase, 
-  Settings, 
-  ChevronDown, 
+import {
+  FileText,
+  Settings,
+  ChevronDown,
   ChevronUp,
   Layout as LayoutIcon,
   ArrowLeft
@@ -19,7 +18,7 @@ interface LayoutProps {
 }
 
 export const Layout: React.FC<LayoutProps> = ({ activeTab, setActiveTab, sidebar, preview }) => {
-  const isEditorMode = activeTab === 'contract' || activeTab === 'cp';
+  const isEditorMode = activeTab === 'contract';
   const containerRef = useRef<HTMLDivElement>(null);
   const scalerRef = useRef<HTMLDivElement>(null);
 
@@ -87,7 +86,6 @@ export const Layout: React.FC<LayoutProps> = ({ activeTab, setActiveTab, sidebar
             <div className="flex p-1 bg-gray-100 rounded-xl gap-1">
               {[
                 { id: 'contract', icon: FileText, label: 'Договор' },
-                { id: 'cp', icon: Briefcase, label: 'КП' },
                 { id: 'settings', icon: Settings, label: 'Настройки' }
               ].map(tab => (
                 <button

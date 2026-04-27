@@ -19,15 +19,17 @@ interface ContractBuilderProps {
   onBack: () => void;
   onDocxUpload: (file: File) => Promise<{ content: string; fields: TemplateField[] }>;
   initialTemplate?: Template;
+  templateType?: 'Contract' | 'CP';
 }
 
-export const ContractBuilder: React.FC<ContractBuilderProps> = ({ 
-  onSave, 
-  onBack, 
+export const ContractBuilder: React.FC<ContractBuilderProps> = ({
+  onSave,
+  onBack,
   onDocxUpload,
-  initialTemplate 
+  initialTemplate,
+  templateType = 'Contract'
 }) => {
-  const [name, setName] = useState(initialTemplate?.name || 'Новый шаблон договора');
+  const [name, setName] = useState(initialTemplate?.name || (templateType === 'CP' ? 'Новый шаблон КП' : 'Новый шаблон договора'));
   const [content, setContent] = useState(initialTemplate?.content || '');
   const [fields, setFields] = useState<TemplateField[]>(initialTemplate?.fields || []);
   const [isUploading, setIsUploading] = useState(false);
@@ -56,7 +58,7 @@ export const ContractBuilder: React.FC<ContractBuilderProps> = ({
     onSave({
       id: initialTemplate?.id || Date.now().toString(),
       name,
-      type: 'Contract',
+      type: templateType,
       content,
       fields
     });

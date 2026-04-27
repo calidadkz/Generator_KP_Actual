@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   FileText, 
   User, 
@@ -11,7 +11,7 @@ import {
 import { CollapsibleSection } from '../UI/Layout';
 import { ContractState, Specification, LineItem, CompanyDetails } from '../../types';
 
-import { downloadAsPDF } from '../../utils/pdf';
+import { downloadAsPDF } from '../../utils/contractPdf';
 import { Download } from 'lucide-react';
 
 interface ContractSidebarProps {
@@ -35,22 +35,34 @@ export const ContractSidebar: React.FC<ContractSidebarProps> = ({
   expandedBlocks,
   toggleBlock
 }) => {
-  const handleDownload = () => {
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const handleDownload = async () => {
     const element = document.getElementById('template-preview') || document.getElementById('contract-preview');
-    if (element) {
-      downloadAsPDF(element.id, `Договор_${contract.number}_${contract.buyer.name}`);
+    if (!element || isDownloading) return;
+    setIsDownloading(true);
+    try {
+      await downloadAsPDF(element.id, `Договор_${contract.number}_${contract.buyer.name}`);
+    } catch (err: any) {
+      alert('Не удалось создать PDF: ' + (err?.message || String(err)));
+    } finally {
+      setIsDownloading(false);
     }
   };
 
   return (
     <div className="space-y-2 pb-20">
       <div className="px-6 py-4">
-        <button 
+        <button
           onClick={handleDownload}
-          className="w-full flex items-center justify-center gap-2 bg-calidad-red text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-red-200 hover:bg-red-700 transition-all hover:scale-[1.02] active:scale-95"
+          disabled={isDownloading}
+          className="w-full flex items-center justify-center gap-2 bg-calidad-red text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-red-200 hover:bg-red-700 transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-60 disabled:scale-100 disabled:cursor-not-allowed"
         >
-          <Download size={20} />
-          Скачать в PDF
+          {isDownloading ? (
+            <><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Генерация...</>
+          ) : (
+            <><Download size={20} /> Скачать в PDF</>
+          )}
         </button>
       </div>
 

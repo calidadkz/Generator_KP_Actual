@@ -2,105 +2,98 @@ import React, { useState, useEffect } from 'react';
 import { AppTab } from './types';
 import { Layout } from './components/UI/Layout';
 import { ContractSidebar } from './components/Contract/ContractSidebar';
-import { CPSidebar } from './components/CP/CPSidebar';
 import { SettingsSidebar } from './components/Settings/SettingsSidebar';
 import { ContractPreview } from './components/Contract/ContractPreview';
-import { CPPreview } from './components/CP/CPPreview';
 import { TemplateControls } from './components/UI/TemplateControls';
 import { useContract } from './hooks/useContract';
-import { useCP } from './hooks/useCP';
 import { useSettings } from './context/SettingsContext';
 import { useTemplates } from './hooks/useTemplates';
 import { renderTemplate } from './services/templateService';
 import { Stamp } from './components/UI/Stamp';
 
 import { Dashboard } from './components/UI/Dashboard';
-import { CPBuilder } from './components/CP/CPBuilder';
 import { ContractBuilder } from './components/Contract/ContractBuilder';
 import { TemplatesLibrary } from './components/UI/TemplatesLibrary';
-import { Template, CPTemplate } from './types';
+import { GeneratorPage } from './components/CP/GeneratorPage';
+import { TemplateMapper } from './components/CP/TemplateMapper';
+import { ManagerCockpit } from './components/Sales/ManagerCockpit';
+import { AdminPanel } from './components/Sales/AdminPanel';
+import { Template } from './types';
+import { useDocumentStore } from './store/useDocumentStore';
+
+const VALID_TABS: AppTab[] = [
+  'contract',
+  'settings',
+  'dashboard',
+  'contract-builder',
+  'templates-library',
+  'template-mapper',
+  'kp-generator',
+  'sales-cockpit',
+  'sales-admin',
+];
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<AppTab>(() => {
     const saved = localStorage.getItem('calidad_active_tab');
-    return (saved as AppTab) || 'dashboard';
+    return VALID_TABS.includes(saved as AppTab) ? (saved as AppTab) : 'dashboard';
   });
 
   const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
-  const [editingCPTemplate, setEditingCPTemplate] = useState<CPTemplate | null>(null);
 
   useEffect(() => {
     localStorage.setItem('calidad_active_tab', activeTab);
   }, [activeTab]);
 
-  useEffect(() => {
-    (window as any).onEditCPTemplate = (template: CPTemplate) => {
-      setEditingCPTemplate(template);
-      setActiveTab('cp-builder');
-    };
-    return () => {
-      delete (window as any).onEditCPTemplate;
-    };
-  }, []);
-
-  const { 
-    contract, 
-    totalAmount, 
-    totalAmountWords, 
-    updateContract, 
-    updateBuyer, 
-    addLineItem, 
-    removeLineItem, 
+  const {
+    contract,
+    totalAmount,
+    totalAmountWords,
+    updateContract,
+    updateBuyer,
+    addLineItem,
+    removeLineItem,
     updateLineItem,
     resetContract,
     showStamp,
     stampPositions,
     updateStampPosition,
-    updateStampScale
+    updateStampScale,
   } = useContract();
 
-  const { cp, updateCP, updateCPPrice, resetCP } = useCP();
   const { supplier, resetSettings } = useSettings();
-  
+
   const {
     templates,
-    cpTemplates,
     activeTemplateId,
-    activeCPTemplateId,
     setActiveTemplateId,
-    setActiveCPTemplateId,
     activeTemplate,
-    activeCPTemplate,
     isAdvancedMode,
     setIsAdvancedMode,
     handleDocxUpload,
     extractVariable,
     saveTemplate,
     saveActiveTemplateChanges,
-    saveCPTemplate,
     deleteTemplate,
     updateTemplateField,
-    resetTemplates
+    resetTemplates,
   } = useTemplates(activeTab);
 
   const [expandedBlocks, setExpandedBlocks] = useState<Record<string, boolean>>({
     doc: true,
     spec: true,
     buyer: true,
-    cp_main: true,
-    cp_prices: true,
-    cp_manager: true,
-    settings_supplier: true
+    settings_supplier: true,
   });
 
-  const toggleBlock = (id: string) => setExpandedBlocks(prev => ({ ...prev, [id]: !prev[id] }));
+  const toggleBlock = (id: string) => setExpandedBlocks((prev) => ({ ...prev, [id]: !prev[id] }));
 
   const handleResetAll = () => {
     if (confirm('Вы уверены, что хотите сбросить все данные?')) {
       resetContract();
-      resetCP();
       resetSettings();
       resetTemplates();
+      useDocumentStore.getState().resetAssembly();
       window.location.reload();
     }
   };
@@ -110,7 +103,7 @@ export default function App() {
       case 'contract':
         return (
           <div className="space-y-6">
-            <ContractSidebar 
+            <ContractSidebar
               contract={contract}
               updateContract={updateContract}
               updateBuyer={updateBuyer}
@@ -121,8 +114,8 @@ export default function App() {
               toggleBlock={toggleBlock}
             />
             <div className="px-6 pb-6">
-              <TemplateControls 
-                templates={templates.filter(t => t.type === 'Contract' || t.type === 'contract')}
+              <TemplateControls
+                templates={templates.filter((t) => t.type === 'Contract' || t.type === 'contract')}
                 activeTemplateId={activeTemplateId}
                 setActiveTemplateId={setActiveTemplateId}
                 isAdvancedMode={isAdvancedMode}
@@ -138,41 +131,9 @@ export default function App() {
             </div>
           </div>
         );
-      case 'cp':
-        return (
-          <div className="space-y-6">
-            <CPSidebar 
-              cp={cp}
-              updateCP={updateCP}
-              updateCPPrice={updateCPPrice}
-              expandedBlocks={expandedBlocks}
-              toggleBlock={toggleBlock}
-              cpTemplates={cpTemplates}
-              activeCPTemplateId={activeCPTemplateId}
-              setActiveCPTemplateId={setActiveCPTemplateId}
-              supplier={supplier}
-            />
-            <div className="px-6 pb-6">
-              <TemplateControls 
-                templates={templates.filter(t => t.type === 'CP')}
-                activeTemplateId={activeTemplateId}
-                setActiveTemplateId={setActiveTemplateId}
-                isAdvancedMode={isAdvancedMode}
-                setIsAdvancedMode={setIsAdvancedMode}
-                handleDocxUpload={handleDocxUpload}
-                extractVariable={extractVariable}
-                saveTemplate={saveActiveTemplateChanges}
-                deleteTemplate={deleteTemplate}
-                updateTemplateField={updateTemplateField}
-                activeTemplate={activeTemplate}
-                onOpenBuilder={() => setActiveTab('cp-builder')}
-              />
-            </div>
-          </div>
-        );
       case 'settings':
         return (
-          <SettingsSidebar 
+          <SettingsSidebar
             expandedBlocks={expandedBlocks}
             toggleBlock={toggleBlock}
             onResetAll={handleResetAll}
@@ -184,38 +145,44 @@ export default function App() {
   };
 
   const renderPreview = () => {
-    if (activeTemplate) {
+    const tabTemplateType = ['contract', 'Contract'];
+    const tabActiveTemplate =
+      activeTemplate && tabTemplateType.includes(activeTemplate.type) ? activeTemplate : null;
+
+    if (tabActiveTemplate) {
       return (
         <div id="template-preview" className="flex flex-col items-center gap-10 print:block print:gap-0">
           <div className="relative">
-            <div 
+            <div
               className={`relative ${isAdvancedMode ? 'cursor-text' : ''}`}
-              dangerouslySetInnerHTML={{ 
+              dangerouslySetInnerHTML={{
                 __html: renderTemplate(
-                  activeTemplate.content, 
-                  supplier, 
-                  contract, 
-                  cp, 
-                  activeTab, 
-                  totalAmount, 
+                  tabActiveTemplate.content,
+                  supplier,
+                  contract,
+                  {} as any,
+                  activeTab,
+                  totalAmount,
                   totalAmountWords,
-                  activeTemplate
-                ) 
+                  tabActiveTemplate,
+                ),
               }}
             />
             {activeTab === 'contract' && (
               <>
-                {['contract-p1', 'contract-p2', 'contract-p3', 'contract-p4', 'contract-p5'].map(pageId => (
-                  <Stamp 
-                    key={pageId}
-                    pageId={pageId}
-                    stampUrl={supplier.stampUrl}
-                    showStamp={showStamp}
-                    position={stampPositions[pageId] || { x: 400, y: 700, scale: 1 }}
-                    onUpdatePosition={updateStampPosition}
-                    onUpdateScale={updateStampScale}
-                  />
-                ))}
+                {['contract-p1', 'contract-p2', 'contract-p3', 'contract-p4', 'contract-p5'].map(
+                  (pageId) => (
+                    <Stamp
+                      key={pageId}
+                      pageId={pageId}
+                      stampUrl={supplier.stampUrl}
+                      showStamp={showStamp}
+                      position={stampPositions[pageId] || { x: 400, y: 700, scale: 1 }}
+                      onUpdatePosition={updateStampPosition}
+                      onUpdateScale={updateStampScale}
+                    />
+                  ),
+                )}
               </>
             )}
           </div>
@@ -226,7 +193,7 @@ export default function App() {
     switch (activeTab) {
       case 'contract':
         return (
-          <ContractPreview 
+          <ContractPreview
             contract={contract}
             supplier={supplier}
             totalAmount={totalAmount}
@@ -237,8 +204,6 @@ export default function App() {
             updateStampScale={updateStampScale}
           />
         );
-      case 'cp':
-        return <CPPreview cp={cp} supplier={supplier} activeCPTemplate={activeCPTemplate} totalAmount={cp.prices.m2 + cp.prices.ruida} />;
       default:
         return (
           <div className="flex items-center justify-center h-full text-gray-400 font-bold uppercase tracking-widest">
@@ -248,70 +213,61 @@ export default function App() {
     }
   };
 
+  // ── Full-page routes ─────────────────────────────────────────────────────────
+
   if (activeTab === 'dashboard') {
     return <Dashboard onSetActiveTab={setActiveTab} />;
   }
 
+  if (activeTab === 'kp-generator') {
+    return (
+      <GeneratorPage
+        onBack={() => setActiveTab('dashboard')}
+        onManageTemplates={() => setActiveTab('template-mapper')}
+      />
+    );
+  }
+
+  if (activeTab === 'template-mapper') {
+    return <TemplateMapper onBack={() => setActiveTab('dashboard')} />;
+  }
+
   if (activeTab === 'templates-library') {
     return (
-      <TemplatesLibrary 
+      <TemplatesLibrary
         templates={templates}
-        cpTemplates={cpTemplates}
         onBack={() => setActiveTab('dashboard')}
         onEditTemplate={(t) => {
           setEditingTemplate(t);
           setActiveTab('contract-builder');
         }}
-        onEditCPTemplate={(t) => {
-          setEditingCPTemplate(t);
-          setActiveTab('cp-builder');
-        }}
         onDeleteTemplate={deleteTemplate}
-        onDeleteCPTemplate={(id) => {
-          // Add deleteCPTemplate to useTemplates
-          console.log('Delete CP Template:', id);
-        }}
-        onNewTemplate={(type) => {
-          if (type === 'Contract') {
-            setEditingTemplate(null);
-            setActiveTab('contract-builder');
-          } else {
-            setEditingCPTemplate(null);
-            setActiveTab('cp-builder');
-          }
+        onNewTemplate={() => {
+          setEditingTemplate(null);
+          setActiveTab('contract-builder');
         }}
       />
     );
   }
 
-  if (activeTab === 'cp-builder') {
-    return (
-      <CPBuilder 
-        onBack={() => {
-          setEditingCPTemplate(null);
-          setActiveTab('cp');
-        }}
-        initialTemplate={editingCPTemplate || undefined}
-        onSave={(template) => {
-          saveCPTemplate(template);
-          setEditingCPTemplate(null);
-          setActiveTab('cp');
-        }}
-        cp={cp}
-        supplier={supplier}
-      />
-    );
+  if (activeTab === 'sales-cockpit') {
+    return <ManagerCockpit onBack={() => setActiveTab('dashboard')} />;
+  }
+
+  if (activeTab === 'sales-admin') {
+    return <AdminPanel onBack={() => setActiveTab('dashboard')} />;
   }
 
   if (activeTab === 'contract-builder') {
     return (
-      <ContractBuilder 
+      <ContractBuilder
         onBack={() => {
           setEditingTemplate(null);
           setActiveTab('dashboard');
         }}
         initialTemplate={editingTemplate || undefined}
         onDocxUpload={handleDocxUpload}
+        templateType="Contract"
         onSave={(template) => {
           saveTemplate(template);
           setEditingTemplate(null);
@@ -322,7 +278,7 @@ export default function App() {
   }
 
   return (
-    <Layout 
+    <Layout
       activeTab={activeTab}
       setActiveTab={setActiveTab}
       sidebar={renderSidebar()}
