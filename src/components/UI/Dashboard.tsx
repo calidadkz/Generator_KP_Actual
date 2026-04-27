@@ -12,12 +12,15 @@ import {
 } from 'lucide-react';
 import { AppTab } from '../../types';
 import { motion } from 'framer-motion';
+import { useDBStatus } from '../../hooks/useDBStatus';
+import { DBStatusIndicator } from './DBStatusIndicator';
 
 interface DashboardProps {
   onSetActiveTab: (tab: AppTab) => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ onSetActiveTab }) => {
+  const dbStatus = useDBStatus();
   const actions = [
     {
       id: 'kp-generator',
@@ -89,8 +92,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSetActiveTab }) => {
     <div className="min-h-screen bg-gray-50 p-8 md:p-12">
       <div className="max-w-6xl mx-auto">
         <header className="mb-12">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">CALIDAD Document Builder</h1>
-          <p className="text-gray-500 text-lg">Выберите действие для начала работы</p>
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <h1 className="text-4xl font-bold text-gray-900 mb-2">CALIDAD Document Builder</h1>
+              <p className="text-gray-500 text-lg">Выберите действие для начала работы</p>
+            </div>
+            <DBStatusIndicator status={dbStatus} />
+          </div>
         </header>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
