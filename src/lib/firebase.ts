@@ -13,8 +13,7 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Initialize Firestore with default database
-// Note: Project has 'databasekp' as named database, but using (default) for now
-const db = getFirestore(app);
+// Initialize Firestore with databasekp database
+const db = getFirestore(app, 'databasekp');
 
 export { app, db };
