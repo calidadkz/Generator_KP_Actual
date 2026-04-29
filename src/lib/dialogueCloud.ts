@@ -47,12 +47,18 @@ export async function uploadToCloud(
   try {
     const docRef = doc(db, DIALOGUES_COLLECTION, record.id);
 
-    // Store metadata in Firestore
+    // Remove undefined values (Firestore doesn't allow them)
+    const cleanRecord = Object.fromEntries(
+      Object.entries(record).filter(([, v]) => v !== undefined)
+    ) as DialogueRecord;
+
+    // Store metadata in Firestore (exclude large text buffers)
     await setDoc(docRef, {
-      ...record,
-      // Don't store large text buffers in Firestore — only the reference
+      ...cleanRecord,
+      // Explicitly don't include raw text fields
       rawText: undefined,
       cleanedText: undefined,
+      rawTextLegacy: undefined,
     });
 
     console.log(`Uploaded dialogue ${record.id} to Firestore`);
