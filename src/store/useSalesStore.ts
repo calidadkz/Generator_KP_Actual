@@ -202,9 +202,11 @@ interface SalesStore {
   addDialogue: (d: DialogueRecord) => void;
   updateDialogue: (id: string, patch: Partial<DialogueRecord>) => void;
   deleteDialogue: (id: string) => void;
+  setDialogues: (dialogues: DialogueRecord[]) => void;
 
   addBatchInsight: (bi: BatchInsights) => void;
   deleteBatchInsight: (id: string) => void;
+  setBatchInsights: (insights: BatchInsights[]) => void;
 
   migrateOldDialogues: () => Promise<void>;
 }
@@ -263,11 +265,13 @@ export const useSalesStore = create<SalesStore>()(
         }
         set((s) => ({ dialogues: s.dialogues.filter((d) => d.id !== id) }));
       },
+      setDialogues: (dialogues) => set({ dialogues }),
 
       addBatchInsight: (bi) =>
         set((s) => ({ batchInsights: [bi, ...s.batchInsights] })),
       deleteBatchInsight: (id) =>
         set((s) => ({ batchInsights: s.batchInsights.filter((b) => b.id !== id) })),
+      setBatchInsights: (insights) => set({ batchInsights: insights }),
 
       migrateOldDialogues: async () => {
         const dialogues = get().dialogues;
