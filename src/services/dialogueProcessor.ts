@@ -19,12 +19,23 @@ async function apiCall<T>(endpoint: string, method: 'GET' | 'POST' = 'POST', bod
     const errorData = await res.json().catch(() => ({}));
     throw new Error((errorData as { error?: string }).error || `API error: ${res.status}`);
   }
-  return res.json();
+
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch (jsonErr) {
+    console.error('JSON parse error:', {
+      endpoint,
+      position: (jsonErr as SyntaxError).message,
+      snippet: text.substring(Math.max(0, text.length - 500)),
+    });
+    throw new Error(`Ошибка парсинга ответа: ${(jsonErr as Error).message}`);
+  }
 }
 
 /** Step 1: quick AI cleaning of transcription artifacts, preserves style */
-export async function cleanDialogueText(rawText: string): Promise<string> {
-  const { cleanedText } = await apiCall<{ cleanedText: string }>('/clean-text', 'POST', { rawText });
+export async function cleanDialogueText(rawText: string, provider?: 'gemini' | 'openai'): Promise<string> {
+  const { cleanedText } = await apiCall<{ cleanedText: string }>('/clean-text', 'POST', { rawText, provider });
   return cleanedText;
 }
 
@@ -32,8 +43,10 @@ export async function cleanDialogueText(rawText: string): Promise<string> {
 export async function analyzeDialogue(
   cleanedText: string,
   onProgress?: (entry: ModelLogEntry) => void,
+  model?: string,
+  provider?: 'gemini' | 'openai',
 ): Promise<ProcessResult> {
-  const result = await apiCall<ProcessResult>('/analyze-dialogue', 'POST', { cleanedText });
+  const result = await apiCall<ProcessResult>('/analyze-dialogue', 'POST', { cleanedText, model, provider });
   if (onProgress && result.log) {
     result.log.forEach(onProgress);
   }
@@ -43,11 +56,12 @@ export async function analyzeDialogue(
 /** Step 3: batch pattern extraction from 5+ analyzed dialogues */
 export async function extractBatchInsights(
   allExtracted: ExtractedDialogueData[],
+  model?: string,
+  provider?: 'gemini' | 'openai',
 ): Promise<BatchInsights> {
-  return apiCall<BatchInsights>('/extract-batch-insights', 'POST', { allExtracted });
+  return apiCall<BatchInsights>('/extract-batch-insights', 'POST', { allExtracted, model, provider });
 }
 
-export async function listAvailableModels(): Promise<string[]> {
-  const { models } = await apiCall<{ models: string[] }>('/available-models', 'GET');
-  return models;
+export async function listAvailableModels(): Promise<{ gemini: string[]; gpt: string[] }> {
+  return apiCall<{ gemini: string[]; gpt: string[] }>('/available-models', 'GET');
 }

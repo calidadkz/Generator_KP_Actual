@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(npm install:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "PowerShell(gcloud run deploy generator-kp --source . --region asia-east1 --project gen-lang-client-0038297950 --set-secrets \"GEMINI_API_KEY=GEMINI_API_KEY:8\" --allow-unauthenticated)"
     ]
   }
 }

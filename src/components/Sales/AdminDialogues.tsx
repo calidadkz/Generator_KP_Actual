@@ -292,8 +292,11 @@ export const AdminDialogues: React.FC = () => {
   const [expandedAnalysis, setExpandedAnalysis] = useState<Record<string, boolean>>({});
   const [loadedTexts, setLoadedTexts] = useState<Record<string, { raw: string; cleaned: string }>>({});
   const [dragOver, setDragOver] = useState(false);
-  const [availableModels, setAvailableModels] = useState<string[] | null>(null);
+  const [availableGeminiModels, setAvailableGeminiModels] = useState<string[] | null>(null);
+  const [availableGptModels] = useState(['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-3.5-turbo']);
   const [checkingModels, setCheckingModels] = useState(false);
+  const [selectedModel, setSelectedModel] = useState<string | null>(null);
+  const [selectedProvider, setSelectedProvider] = useState<'gemini' | 'openai'>('gemini');
   const [batchProcessing, setBatchProcessing] = useState(false);
   const [batchError, setBatchError] = useState<string | null>(null);
 
@@ -412,10 +415,15 @@ export const AdminDialogues: React.FC = () => {
     try {
       const texts = await resolveDialogueTexts(d.textRef);
       if (!texts) throw new Error('Текст не найден в хранилище');
-      const result = await analyzeDialogue(texts.cleanedText || texts.rawText, (entry) => {
-        const current = useSalesStore.getState().dialogues.find((x) => x.id === d.id)?.modelLog ?? [];
-        updateDialogue(d.id, { modelLog: [...current, entry] });
-      });
+      const result = await analyzeDialogue(
+        texts.cleanedText || texts.rawText,
+        (entry) => {
+          const current = useSalesStore.getState().dialogues.find((x) => x.id === d.id)?.modelLog ?? [];
+          updateDialogue(d.id, { modelLog: [...current, entry] });
+        },
+        selectedModel || undefined,
+        selectedProvider,
+      );
       updateDialogue(d.id, {
         analysisStatus: 'done',
         extractedData: result.data,
@@ -439,7 +447,11 @@ export const AdminDialogues: React.FC = () => {
     setBatchProcessing(true);
     setBatchError(null);
     try {
-      const insights = await extractBatchInsights(done.map((d) => d.extractedData!));
+      const insights = await extractBatchInsights(
+        done.map((d) => d.extractedData!),
+        selectedModel || undefined,
+        selectedProvider,
+      );
       addBatchInsight(insights);
     } catch (err) {
       setBatchError(err instanceof Error ? err.message : String(err));
@@ -647,10 +659,12 @@ export const AdminDialogues: React.FC = () => {
   const handleCheckModels = async () => {
     setCheckingModels(true);
     try {
-      const models = await listAvailableModels();
-      setAvailableModels(models);
+      const { gemini, gpt } = await listAvailableModels();
+      setAvailableGeminiModels(gemini);
+      setSelectedModel(null);
+      setSelectedProvider('gemini');
     } catch {
-      setAvailableModels([]);
+      setAvailableGeminiModels([]);
     } finally {
       setCheckingModels(false);
     }
@@ -1129,24 +1143,102 @@ export const AdminDialogues: React.FC = () => {
       )}
 
       {/* Available models panel */}
-      {availableModels !== null && (
-        <div className={`rounded-xl border p-4 ${availableModels.length > 0 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-          {availableModels.length > 0 ? (
-            <>
-              <p className="text-xs font-bold text-green-700 mb-2 flex items-center gap-1.5">
-                <CheckCircle size={13} /> Доступно {availableModels.length} моделей:
+      {availableGeminiModels !== null && (
+        <div className={`rounded-xl border p-4 flex items-start justify-between gap-3 ${availableGeminiModels.length > 0 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+          <div className="flex-1 space-y-3">
+            {availableGeminiModels.length > 0 || availableGptModels.length > 0 ? (
+              <>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setSelectedProvider('gemini')}
+                    className={`px-2 py-1 rounded text-xs font-bold transition-colors ${
+                      selectedProvider === 'gemini'
+                        ? 'bg-blue-500 text-white'
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    }`}
+                  >
+                    Gemini
+                  </button>
+                  <button
+                    onClick={() => setSelectedProvider('openai')}
+                    className={`px-2 py-1 rounded text-xs font-bold transition-colors ${
+                      selectedProvider === 'openai'
+                        ? 'bg-blue-500 text-white'
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    }`}
+                  >
+                    GPT-4
+                  </button>
+                </div>
+
+                {selectedProvider === 'gemini' && availableGeminiModels.length > 0 && (
+                  <>
+                    <p className="text-xs font-bold text-green-700 flex items-center gap-1.5">
+                      <CheckCircle size={13} /> Доступно {availableGeminiModels.length} Gemini моделей:
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {availableGeminiModels.map((m) => (
+                        <button
+                          key={m}
+                          onClick={() => {
+                            setSelectedModel(m);
+                            setSelectedProvider('gemini');
+                          }}
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition-colors ${
+                            selectedModel === m && selectedProvider === 'gemini'
+                              ? 'bg-blue-500 text-white border border-blue-600'
+                              : 'bg-white border border-green-200 text-green-700 hover:bg-green-100'
+                          }`}
+                        >
+                          {m}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {selectedProvider === 'openai' && availableGptModels.length > 0 && (
+                  <>
+                    <p className="text-xs font-bold text-amber-700 flex items-center gap-1.5">
+                      <CheckCircle size={13} /> Доступно {availableGptModels.length} GPT моделей:
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {availableGptModels.map((m) => (
+                        <button
+                          key={m}
+                          onClick={() => {
+                            setSelectedModel(m);
+                            setSelectedProvider('openai');
+                          }}
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition-colors ${
+                            selectedModel === m && selectedProvider === 'openai'
+                              ? 'bg-blue-500 text-white border border-blue-600'
+                              : 'bg-white border border-amber-200 text-amber-700 hover:bg-amber-100'
+                          }`}
+                        >
+                          {m}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </>
+            ) : (
+              <p className="text-xs font-bold text-red-600 flex items-center gap-1.5">
+                <AlertCircle size={13} /> Ключ не даёт доступа ни к одной модели
               </p>
-              <div className="flex flex-wrap gap-1.5">
-                {availableModels.map((m) => (
-                  <span key={m} className="px-2 py-0.5 bg-white border border-green-200 text-green-700 rounded-full text-[10px] font-bold">{m}</span>
-                ))}
-              </div>
-            </>
-          ) : (
-            <p className="text-xs font-bold text-red-600 flex items-center gap-1.5">
-              <AlertCircle size={13} /> Ключ не даёт доступа ни к одной модели
-            </p>
-          )}
+            )}
+          </div>
+          <button
+            onClick={() => {
+              setAvailableGeminiModels(null);
+              setSelectedModel(null);
+            }}
+            className="flex-shrink-0 p-1 hover:bg-white/50 rounded transition-colors"
+            title="Закрыть"
+          >
+            <X size={14} />
+          </button>
         </div>
       )}
 

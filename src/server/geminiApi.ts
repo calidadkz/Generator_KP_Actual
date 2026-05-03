@@ -10,7 +10,11 @@ const PREFERRED_MODELS = [
   'gemini-2.0-flash-lite',
 ];
 
-const SKIP_KEYWORDS = ['embedding', 'tts', 'robotics', 'image', 'computer-use'];
+const SKIP_KEYWORDS = [
+  'embedding', 'tts', 'robotics', 'image', 'computer-use',
+  'veo', 'lyria', 'aqa', 'nano-banana', 'deep-research', 'customtools',
+  'gemma-3-1b', 'gemma-3-4b', 'gemma-3n', 'gemma-4-26b',
+];
 const RECOVERABLE_PHRASES = ['new users', 'not found', 'NOT_FOUND', 'no longer available'];
 
 function isRecoverable(msg: string): boolean {
@@ -21,19 +25,32 @@ let _availableModels: string[] | null = null;
 
 export async function fetchAvailableModels(apiKey: string): Promise<string[]> {
   if (_availableModels) return _availableModels;
+  const keyPreview = apiKey.substring(0, 10) + '...' + apiKey.substring(apiKey.length - 5);
+  console.log(`[geminiApi] fetchAvailableModels: apiKey=${keyPreview}, length=${apiKey.length}`);
+
   for (const ver of ['v1beta', 'v1', 'v1alpha']) {
     try {
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/${ver}/models?key=${apiKey}`,
-      );
-      if (!res.ok) continue;
+      const url = `https://generativelanguage.googleapis.com/${ver}/models?key=${apiKey}`;
+      console.log(`[geminiApi] Fetching models via ${ver}...`);
+      const res = await fetch(url);
+      console.log(`[geminiApi] Response status: ${res.status}`);
+      if (!res.ok) {
+        const text = await res.text();
+        console.error(`[geminiApi] API error on ${ver}: ${res.status} - ${text.substring(0, 200)}`);
+        continue;
+      }
       const data = (await res.json()) as { models?: Array<{ name: string }> };
+      console.log(`[geminiApi] Received ${data.models?.length ?? 0} models from API`);
       _availableModels = (data.models ?? [])
         .map((m) => m.name.replace('models/', ''))
         .filter((name) => !SKIP_KEYWORDS.some((kw) => name.includes(kw)));
+      console.log(`[geminiApi] After filtering: ${_availableModels.length} models`);
       return _availableModels!;
-    } catch { /* try next */ }
+    } catch (err) {
+      console.error(`[geminiApi] fetchAvailableModels error on ${ver}: ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
+  console.error('[geminiApi] No available models found after trying all versions');
   return [];
 }
 
@@ -139,20 +156,21 @@ export async function cleanDialogueText(rawText: string, apiKey: string): Promis
 export async function analyzeDialogue(
   cleanedText: string,
   apiKey: string,
+  model?: string,
   onProgress?: (entry: ModelLogEntry) => void,
 ): Promise<ProcessResult> {
   const prompt = `${ANALYSE_PROMPT}\n\nРАЗГОВОР:\n${cleanedText}`;
   const available = await fetchAvailableModels(apiKey);
-  const ordered = buildOrderedModels(available);
+  const ordered = model ? [model] : buildOrderedModels(available);
 
   if (ordered.length === 0) throw new Error('Нет доступных моделей для этого ключа');
 
   const log: ModelLogEntry[] = [];
   let lastError = '';
 
-  for (const model of ordered) {
+  for (const modelToTry of ordered) {
     try {
-      const text = await callGenerate(model, apiKey, prompt);
+      const text = await callGenerate(modelToTry, apiKey, prompt);
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (!jsonMatch) throw new Error('Нет JSON в ответе: ' + text.slice(0, 200));
       const parsed = JSON.parse(jsonMatch[0]) as ExtractedDialogueData;
@@ -165,19 +183,19 @@ export async function analyzeDialogue(
           }),
         );
       }
-      const entry: ModelLogEntry = { model, status: 'ok' };
+      const entry: ModelLogEntry = { model: modelToTry, status: 'ok' };
       log.push(entry);
       onProgress?.(entry);
-      return { data: parsed, usedModel: model, log };
+      return { data: parsed, usedModel: modelToTry, log };
     } catch (err) {
       lastError = err instanceof Error ? err.message : String(err);
       if (isRecoverable(lastError)) {
-        const entry: ModelLogEntry = { model, status: 'blocked', message: lastError.slice(0, 120) };
+        const entry: ModelLogEntry = { model: modelToTry, status: 'blocked', message: lastError.slice(0, 120) };
         log.push(entry);
         onProgress?.(entry);
         continue;
       }
-      const entry: ModelLogEntry = { model, status: 'error', message: lastError.slice(0, 120) };
+      const entry: ModelLogEntry = { model: modelToTry, status: 'error', message: lastError.slice(0, 120) };
       log.push(entry);
       onProgress?.(entry);
       throw err;

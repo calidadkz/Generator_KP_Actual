@@ -165,17 +165,23 @@ TemplateMapper.tsx                GeneratorPage.tsx
 
 ## Деплой (корень проекта)
 
-🔒 **DEPLOYMENT LOCK:**
-- **GCP Project:** `gen-lang-client-0038297950` (ONLY!)
-- **Region:** `asia-east2` (Hong Kong) (NO us-central1!)
-- **Cloud Run URL:** https://calidad-generator-225103227035.asia-east2.run.app
+### 🔒 GCP Projects Setup
 
-**Deploy Command (ONLY THIS):**
+| Проект | ID | Назначение | API ключ |
+|---|---|---|---|
+| **Generator KP and Dogovors** | `gen-lang-client-0496465292` | Основной: Cloud Run + Gemini API | ✅ GEMINI_API_KEY |
+| **Calidad Supply** | `gen-lang-client-0038297950` | Only: Firebase/Firestore (базы данных) | ❌ Не используется для API |
+
+### ✅ Deploy Command (asia-east1, основной проект)
+
 ```bash
-gcloud run deploy calidad-generator --source . --region asia-east2 \
+gcloud run deploy generator-kp --source . --region asia-east1 \
   --allow-unauthenticated --set-secrets=GEMINI_API_KEY=GEMINI_API_KEY:latest \
-  --project gen-lang-client-0038297950
+  --project gen-lang-client-0496465292
 ```
+
+**Cloud Run URL:** https://generator-kp-550172160790.asia-east1.run.app
+**Status:** ✅ 35 Gemini моделей доступно
 
 ### 🔐 Runtime Secrets Architecture (апрель 2026)
 
