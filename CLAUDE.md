@@ -11,7 +11,7 @@ npm install
 npm run dev  # http://localhost:5173
 ```
 
-**Importante:** Всё в браузере (no backend) → данные в localStorage + IndexedDB. На новом устройстве/браузере данные пропадают (Firebase планируется).
+**Architecture:** React SPA (browser) + Node.js Express backend (API routes, runtime secret management). Data in localStorage + IndexedDB (client) + Firestore (server-side persistence, active since April 27, 2026).
 
 ---
 
@@ -137,7 +137,8 @@ const useStore = create<State>()(
 **Архитектура:**
 - Администратор настраивает скрипт, базу мини-презентаций, типы станков
 - Менеджер во время звонка смотрит ManagerCockpit — скрипт + релевантные МП
-- Административная панель (AdminPanel) анализирует загруженные диалоги через Gemini
+- Административная панель (AdminPanel) анализирует загруженные диалоги: выбор AI модели (Gemini или OpenAI GPT) + параметры анализа
+- **Модели:** Gemini (35 моделей, отфильтрованы видео/музыка/другое) или GPT-4 (gpt-4o, gpt-4o-mini, gpt-4-turbo, gpt-3.5-turbo)
 
 | Компонент | Роль |
 |---|---|
@@ -191,9 +192,9 @@ DialogueRecord {
 ```
 
 **Services:**
-- `dialogueProcessor.ts`: Gemini API (clean text → analyze → batch patterns)
+- `dialogueProcessor.ts`: API wrapper for AI analysis (clean text → analyze → batch patterns) with `model?: string` and `provider?: 'gemini' | 'openai'` parameters
 - `dialogueStorage.ts`: IndexedDB storage for dialogue texts
-- `useSalesStore.ts`: Zustand store for all Sales state
+- `useSalesStore.ts`: Zustand store for all Sales state + `setDialogues()`, `setBatchInsights()` for Firestore sync
 
 ### `/src/lib/` — Core utilities
 
@@ -203,7 +204,15 @@ DialogueRecord {
 | `pdfStorage.ts` | IndexedDB API: `savePdf(buf) → idb://...`, `resolvePdf(ref) → buf` |
 | `imageStorage.ts` | IndexedDB API for images (same pattern) |
 | `dialogueStorage.ts` | IndexedDB API for dialogue texts: `saveDialogueTexts({rawText, cleanedText})` |
-| `dialogueProcessor.ts` | Gemini API: `cleanDialogueText()`, `analyzeDialogue()`, `extractBatchInsights()` |
+| `dialogueProcessor.ts` | API wrapper: `cleanDialogueText()`, `analyzeDialogue()`, `extractBatchInsights()` with `model?` and `provider?` ('gemini'\|'openai') parameters |
+
+### `/src/server/` — Backend (Express + AI APIs)
+
+| Файл | Функция |
+|---|---|
+| `geminiApi.ts` | Gemini API integration: `analyzeDialogue()`, `cleanDialogueText()`, `extractBatchInsights()` + `listAvailableModels()`. Model filtering (removed: veo, lyria, aqa, deep-research, gemma-small). Supports `model?: string` for single-model selection |
+| `openaiApi.ts` | OpenAI GPT integration (gpt-4o, gpt-4o-mini, gpt-4-turbo, gpt-3.5-turbo) with identical function signatures as Gemini for provider switching |
+| `index.ts` | Express server + routes: `/api/clean-text`, `/api/analyze-dialogue`, `/api/extract-batch-insights`, `/api/available-models`. Runtime secret injection (GEMINI_API_KEY, OPENAI_API_KEY from process.env) |
 
 ### `/src/store/` — State Management (Zustand)
 

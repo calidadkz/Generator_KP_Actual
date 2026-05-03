@@ -165,23 +165,26 @@ TemplateMapper.tsx                GeneratorPage.tsx
 
 ## Деплой (корень проекта)
 
-### 🔒 GCP Projects Setup
+### 🔒 GCP Projects Setup (апрель 2026)
 
-| Проект | ID | Назначение | API ключ |
+| Проект | ID | Назначение | Статус |
 |---|---|---|---|
-| **Generator KP and Dogovors** | `gen-lang-client-0496465292` | Основной: Cloud Run + Gemini API | ✅ GEMINI_API_KEY |
-| **Calidad Supply** | `gen-lang-client-0038297950` | Only: Firebase/Firestore (базы данных) | ❌ Не используется для API |
+| **Calidad Supply (Firebase)** | `gen-lang-client-0038297950` | Cloud Run (asia-east1) + Firestore (asia-east2, databasekp) | ✅ АКТИВНЫЙ |
+| ~~Generator KP~~ | ~~gen-lang-client-0496465292~~ | ~~Устаревший (была API здесь)~~ | ❌ DEPRECATED |
 
-### ✅ Deploy Command (asia-east1, основной проект)
+### ✅ Deploy Command (ТЕКУЩИЙ)
 
 ```bash
 gcloud run deploy generator-kp --source . --region asia-east1 \
-  --allow-unauthenticated --set-secrets=GEMINI_API_KEY=GEMINI_API_KEY:latest \
-  --project gen-lang-client-0496465292
+  --project gen-lang-client-0038297950 \
+  --set-secrets=GEMINI_API_KEY=GEMINI_API_KEY:8 \
+  --set-secrets=OPENAI_API_KEY=OPENAI_API_KEY:latest \
+  --allow-unauthenticated
 ```
 
-**Cloud Run URL:** https://generator-kp-550172160790.asia-east1.run.app
-**Status:** ✅ 35 Gemini моделей доступно
+**Cloud Run URL:** https://generator-kp-225103227035.asia-east1.run.app  
+**Firestore Database:** `databasekp` в `gen-lang-client-0038297950` (asia-east2)  
+**Status:** ✅ 35 Gemini моделей + 4 GPT модели, Firestore sync активен (27 апреля 2026)
 
 ### 🔐 Runtime Secrets Architecture (апрель 2026)
 
@@ -255,9 +258,17 @@ Node.js Express (port 8080)
 
 | Файл | Функция |
 |---|---|
-| `dialogueProcessor.ts` | Gemini API: `cleanDialogueText()` → `analyzeDialogue()` → `extractBatchInsights()` |
+| `dialogueProcessor.ts` | API wrapper: `cleanDialogueText()` → `analyzeDialogue()` → `extractBatchInsights()` с параметрами `model?` и `provider?` ('gemini'\|'openai') |
 | `dialogueStorage.ts` | IndexedDB: `saveDialogueTexts({rawText, cleanedText})` → ref |
-| `useSalesStore.ts` | Zustand store для всего Sales state |
+| `useSalesStore.ts` | Zustand store для всего Sales state + `setDialogues()`, `setBatchInsights()` для Firestore sync |
+
+### Backend: Gemini + OpenAI GPT
+
+| Файл | Функция | Дата |
+|---|---|---|
+| `src/server/geminiApi.ts` | Gemini API: models с фильтром (убрали veo, lyria, aqa, deep-research, gemma-small) + параметр `model?: string` для выбора конкретной | апр 29 |
+| `src/server/openaiApi.ts` | OpenAI GPT API (gpt-4o, gpt-4o-mini, gpt-4-turbo) с тем же API signature | апр 29 |
+| `src/server/index.ts` | Routes `/api/clean-text`, `/api/analyze-dialogue`, `/api/extract-batch-insights` + `/api/available-models` → `{gemini: [], gpt: []}` | апр 29 |
 
 ### Ключевые фичи (апрель 2026)
 
@@ -270,6 +281,9 @@ Node.js Express (port 8080)
 ✅ AdminDialogues: привязка диалога к типам станков (chips)  
 ✅ AdminDialogues: группировка по типу станка (список/группы)  
 ✅ AdminScript: выбор категории этапа  
+✅ **[NEW] AdminDialogues: выбор модели AI** — кликнуть на модель в панели → синий бейдж + анализ использует её  
+✅ **[NEW] Model filtering** — убрали из списка: veo-* (видео), lyria-* (музыка), aqa, nano-banana, deep-research, gemma-small  
+✅ **[NEW] Provider switching** — кнопки [Gemini] / [GPT-4] + модели GPT: gpt-4o, gpt-4o-mini, gpt-4-turbo  
 
 ### Firebase roadmap (следующий этап)
 
