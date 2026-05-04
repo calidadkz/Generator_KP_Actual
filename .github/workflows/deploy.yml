@@ -1,0 +1,48 @@
+name: Deploy to Cloud Run
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  PROJECT_ID: gen-lang-client-0038297950
+  REGION: asia-east1
+  SERVICE_NAME: generator-kp
+  REPO_NAME: calidad
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/225103227035/locations/global/workloadIdentityProviders/github-provider
+          service_account: cloud-run-deployer@gen-lang-client-0038297950.iam.gserviceaccount.com
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Build and push Docker image
+        run: |
+          gcloud builds submit \
+            --config cloudbuild.yaml \
+            --project=${{ env.PROJECT_ID }} \
+            --substitutions=COMMIT_SHA=${{ github.sha }},_REGION=${{ env.REGION }},_SERVICE_NAME=${{ env.SERVICE_NAME }},_REPO_NAME=${{ env.REPO_NAME }}
+
+      - name: Get deployment status
+        run: |
+          gcloud run services describe ${{ env.SERVICE_NAME }} \
+            --platform managed \
+            --region ${{ env.REGION }} \
+            --project ${{ env.PROJECT_ID }} \
+            --format='value(status.url)'
