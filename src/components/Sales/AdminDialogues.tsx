@@ -11,8 +11,10 @@ import {
   analyzeDialogue,
   cleanDialogueText,
   extractBatchInsights,
+  extractArticlePatterns,
   listAvailableModels,
 } from '../../services/dialogueProcessor';
+import { CleaningConfigEditor } from './CleaningConfigEditor';
 import {
   resolveDialogueTexts,
   saveDialogueTexts,
@@ -299,6 +301,7 @@ export const AdminDialogues: React.FC = () => {
   const [selectedProvider, setSelectedProvider] = useState<'gemini' | 'openai'>('gemini');
   const [batchProcessing, setBatchProcessing] = useState(false);
   const [batchError, setBatchError] = useState<string | null>(null);
+  const [extractArticlePatternsIds, setExtractArticlePatternsIds] = useState<Set<string>>(new Set());
 
   // Dedup flash: keys that are "already exists"
   const [dupFlashKeys, setDupFlashKeys] = useState<Set<string>>(new Set());
@@ -424,11 +427,34 @@ export const AdminDialogues: React.FC = () => {
         selectedModel || undefined,
         selectedProvider,
       );
+
+      let finalExtractedData = result.data;
+
+      // If checkbox is enabled, also extract article patterns
+      if (extractArticlePatternsIds.has(d.id)) {
+        try {
+          const patterns = await extractArticlePatterns(
+            texts.cleanedText || texts.rawText,
+            selectedProvider,
+            selectedModel || undefined,
+          );
+          finalExtractedData = {
+            ...result.data,
+            articleTopics: patterns.articleTopics,
+            painPoints: patterns.painPoints,
+            styleMarkers: patterns.styleMarkers,
+          };
+        } catch (patternErr) {
+          console.error('Failed to extract article patterns:', patternErr);
+          // Continue without article patterns if extraction fails
+        }
+      }
+
       updateDialogue(d.id, {
         analysisStatus: 'done',
-        extractedData: result.data,
-        clientType: result.data.clientType,
-        machineTypeHint: result.data.machineTypeHint,
+        extractedData: finalExtractedData,
+        clientType: finalExtractedData.clientType,
+        machineTypeHint: finalExtractedData.machineTypeHint,
         usedModel: result.usedModel,
         modelLog: result.log,
       });
@@ -774,12 +800,33 @@ export const AdminDialogues: React.FC = () => {
                 </button>
               )}
               {d.cleanStatus === 'ready' && d.analysisStatus === 'pending' && (
-                <button
-                  onClick={() => handleAnalyze(d)}
-                  className="flex items-center gap-1 px-2.5 py-1.5 bg-calidad-blue text-white rounded-lg text-xs font-bold hover:bg-blue-800 transition-colors"
-                >
-                  <Sparkles size={12} /> Анализировать
-                </button>
+                <div className="flex items-center gap-2">
+                  <label className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-xs font-bold cursor-pointer transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={extractArticlePatternsIds.has(d.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setExtractArticlePatternsIds((prev) => new Set([...prev, d.id]));
+                        } else {
+                          setExtractArticlePatternsIds((prev) => {
+                            const next = new Set(prev);
+                            next.delete(d.id);
+                            return next;
+                          });
+                        }
+                      }}
+                      className="w-4 h-4 cursor-pointer"
+                    />
+                    Для статей
+                  </label>
+                  <button
+                    onClick={() => handleAnalyze(d)}
+                    className="flex items-center gap-1 px-2.5 py-1.5 bg-calidad-blue text-white rounded-lg text-xs font-bold hover:bg-blue-800 transition-colors"
+                  >
+                    <Sparkles size={12} /> Анализировать
+                  </button>
+                </div>
               )}
               {d.analysisStatus === 'error' && (
                 <button
@@ -1089,6 +1136,9 @@ export const AdminDialogues: React.FC = () => {
 
   return (
     <div className="space-y-4">
+      {/* Cleaning Config Editor */}
+      <CleaningConfigEditor />
+
       {/* Header */}
       <div className="flex items-center justify-between mb-2">
         <div>

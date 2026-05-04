@@ -6,8 +6,31 @@ import {
   MicroPresentation,
   ScriptNode,
   DialogueRecord,
+  Article,
+  StyleDNA,
+  FewShotExample,
+  CleaningConfig,
 } from '../types';
 import { deleteDialogueTexts, saveDialogueTexts } from '../lib/dialogueStorage';
+
+const defaultCleaningConfig: CleaningConfig = {
+  geminiPrompt: `Это расшифровка телефонного разговора. Исправь ТОЛЬКО явные ошибки распознавания речи:
+- слова с сильным искажением (где очевидно что имелось в виду)
+- слипшиеся слова
+- явные артефакты транскрибации
+
+НЕ меняй:
+- стиль и манеру речи
+- разговорные выражения (ну, вот, м...)
+- структуру диалога
+- паузы и заполнители
+
+Верни ТОЛЬКО очищенный текст без пояснений.`,
+  openaiPrompt: `Очисти этот текст телефонного разговора от артефактов (шумы, заикания, ненужные слова).
+Сохрани смысл и стиль:`,
+  geminiModel: undefined,
+  openaiModel: 'gpt-4o-mini',
+};
 
 const defaultMachineTypes: MachineType[] = [
   { id: 'mt-01', name: 'Лазерный резчик CO2', description: 'Резка и гравировка неметаллов, акрил, дерево, ткань', qualifiers: ['Какой материал резать?', 'Нужна ли гравировка?'] },
@@ -185,6 +208,11 @@ interface SalesStore {
   microPresentations: MicroPresentation[];
   dialogues: DialogueRecord[];
   batchInsights: BatchInsights[];
+  // Article pipeline
+  articles: Article[];
+  styleDNA: StyleDNA | null;
+  fewShotExamples: FewShotExample[];
+  cleaningConfig: CleaningConfig;
 
   addMachineType: (t: MachineType) => void;
   updateMachineType: (id: string, patch: Partial<MachineType>) => void;
@@ -208,6 +236,17 @@ interface SalesStore {
   deleteBatchInsight: (id: string) => void;
   setBatchInsights: (insights: BatchInsights[]) => void;
 
+  // Article actions
+  addArticle: (a: Article) => void;
+  updateArticle: (id: string, patch: Partial<Article>) => void;
+  deleteArticle: (id: string) => void;
+  setStyleDNA: (dna: StyleDNA) => void;
+  clearStyleDNA: () => void;
+  addFewShotExample: (ex: FewShotExample) => void;
+  updateFewShotExample: (id: string, patch: Partial<FewShotExample>) => void;
+  deleteFewShotExample: (id: string) => void;
+  updateCleaningConfig: (patch: Partial<CleaningConfig>) => void;
+
   migrateOldDialogues: () => Promise<void>;
 }
 
@@ -219,6 +258,10 @@ export const useSalesStore = create<SalesStore>()(
       microPresentations: defaultMicroPresentations,
       dialogues: [],
       batchInsights: [],
+      articles: [],
+      styleDNA: null,
+      fewShotExamples: [],
+      cleaningConfig: defaultCleaningConfig,
 
       addMachineType: (t) =>
         set((s) => ({ machineTypes: [...s.machineTypes, t] })),
@@ -273,6 +316,36 @@ export const useSalesStore = create<SalesStore>()(
         set((s) => ({ batchInsights: s.batchInsights.filter((b) => b.id !== id) })),
       setBatchInsights: (insights) => set({ batchInsights: insights }),
 
+      addArticle: (a) =>
+        set((s) => ({ articles: [...s.articles, a] })),
+      updateArticle: (id, patch) =>
+        set((s) => ({
+          articles: s.articles.map((a) => (a.id === id ? { ...a, ...patch } : a)),
+        })),
+      deleteArticle: (id) =>
+        set((s) => ({ articles: s.articles.filter((a) => a.id !== id) })),
+
+      setStyleDNA: (dna) => set({ styleDNA: dna }),
+      clearStyleDNA: () => set({ styleDNA: null }),
+
+      addFewShotExample: (ex) =>
+        set((s) => ({ fewShotExamples: [...s.fewShotExamples, ex] })),
+      updateFewShotExample: (id, patch) =>
+        set((s) => ({
+          fewShotExamples: s.fewShotExamples.map((ex) =>
+            ex.id === id ? { ...ex, ...patch } : ex,
+          ),
+        })),
+      deleteFewShotExample: (id) =>
+        set((s) => ({
+          fewShotExamples: s.fewShotExamples.filter((ex) => ex.id !== id),
+        })),
+
+      updateCleaningConfig: (patch) =>
+        set((s) => ({
+          cleaningConfig: { ...s.cleaningConfig, ...patch },
+        })),
+
       migrateOldDialogues: async () => {
         const dialogues = get().dialogues;
         for (const d of dialogues) {
@@ -290,7 +363,7 @@ export const useSalesStore = create<SalesStore>()(
     }),
     {
       name: 'calidad_sales',
-      version: 2,
+      version: 3,
       migrate: (state: unknown, version: number) => {
         const s = state as Record<string, unknown>;
         if (version < 2) {
@@ -314,6 +387,12 @@ export const useSalesStore = create<SalesStore>()(
               modelLog: d.modelLog,
             };
           });
+        }
+        if (version < 3) {
+          s.articles = [];
+          s.styleDNA = null;
+          s.fewShotExamples = [];
+          s.cleaningConfig = defaultCleaningConfig;
         }
         return s as SalesStore;
       },

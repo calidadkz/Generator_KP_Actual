@@ -14,6 +14,7 @@ import { AppTab } from '../../types';
 import { motion } from 'framer-motion';
 import { useDBStatus } from '../../hooks/useDBStatus';
 import { DBStatusIndicator } from './DBStatusIndicator';
+import { WordPressStatusIndicator } from './WordPressStatusIndicator';
 
 interface DashboardProps {
   onSetActiveTab: (tab: AppTab) => void;
@@ -97,7 +98,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSetActiveTab }) => {
               <h1 className="text-4xl font-bold text-gray-900 mb-2">CALIDAD Document Builder</h1>
               <p className="text-gray-500 text-lg">Выберите действие для начала работы</p>
             </div>
-            <DBStatusIndicator status={dbStatus} />
+            <div className="flex gap-2">
+              <WordPressStatusIndicator />
+              <DBStatusIndicator status={dbStatus} />
+            </div>
           </div>
         </header>
 

@@ -1,17 +1,21 @@
 import React, { useState } from 'react';
-import { ArrowLeft, MessageSquare, BookOpen, Presentation, Cpu } from 'lucide-react';
+import { ArrowLeft, MessageSquare, BookOpen, Presentation, Cpu, Library, FileText } from 'lucide-react';
 import { AdminDialogues } from './AdminDialogues';
 import { AdminScript } from './AdminScript';
 import { AdminMicroPresentations } from './AdminMicroPresentations';
 import { AdminMachineTypes } from './AdminMachineTypes';
+import { HolisticLibraryView } from './HolisticLibraryView';
+import { AdminArticles } from './AdminArticles';
 
-type AdminTab = 'dialogues' | 'script' | 'micropresentations' | 'machinetypes';
+type AdminTab = 'dialogues' | 'script' | 'micropresentations' | 'machinetypes' | 'library' | 'articles';
 
 const TABS: { id: AdminTab; label: string; icon: React.ElementType }[] = [
   { id: 'dialogues',          label: 'Диалоги',          icon: MessageSquare },
   { id: 'script',             label: 'Скрипт',            icon: BookOpen },
   { id: 'micropresentations', label: 'Мини-презентации',  icon: Presentation },
   { id: 'machinetypes',       label: 'Типы станков',      icon: Cpu },
+  { id: 'library',            label: 'Библиотека',        icon: Library },
+  { id: 'articles',           label: 'Статьи',            icon: FileText },
 ];
 
 interface AdminPanelProps {
@@ -27,6 +31,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
       case 'script':             return <AdminScript />;
       case 'micropresentations': return <AdminMicroPresentations />;
       case 'machinetypes':       return <AdminMachineTypes />;
+      case 'library':            return <HolisticLibraryView />;
+      case 'articles':           return <AdminArticles />;
     }
   };
 

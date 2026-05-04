@@ -22,6 +22,7 @@ export const AdminMicroPresentations: React.FC = () => {
     useSalesStore();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [filterCategory, setFilterCategory] = useState<string>('');
+  const [filterMachineTypeId, setFilterMachineTypeId] = useState<string>('');
 
   const toggle = (id: string) => setExpanded((p) => ({ ...p, [id]: !p[id] }));
 
@@ -38,9 +39,9 @@ export const AdminMicroPresentations: React.FC = () => {
     setExpanded((p) => ({ ...p, [mp.id]: true }));
   };
 
-  const filtered = filterCategory
-    ? microPresentations.filter((mp) => mp.category === filterCategory)
-    : microPresentations;
+  const filtered = microPresentations
+    .filter((mp) => !filterCategory || mp.category === filterCategory)
+    .filter((mp) => !filterMachineTypeId || (mp.machineTypeIds ?? []).includes(filterMachineTypeId));
 
   const toggleMachineType = (mp: MicroPresentation, typeId: string) => {
     const ids = mp.machineTypeIds ?? [];
@@ -69,14 +70,14 @@ export const AdminMicroPresentations: React.FC = () => {
       </div>
 
       {/* Filter by category */}
-      <div className="flex flex-wrap gap-1.5 mb-2">
+      <div className="flex flex-wrap gap-1.5 mb-3">
         <button
           onClick={() => setFilterCategory('')}
           className={`px-2.5 py-1 rounded-full text-xs font-bold transition-colors ${
             filterCategory === '' ? 'bg-calidad-blue text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
           }`}
         >
-          Все
+          Все категории
         </button>
         {CATEGORIES.map((cat) => (
           <button
@@ -89,6 +90,31 @@ export const AdminMicroPresentations: React.FC = () => {
             }`}
           >
             {cat}
+          </button>
+        ))}
+      </div>
+
+      {/* Filter by machine type */}
+      <div className="flex flex-wrap gap-1.5 mb-2">
+        <button
+          onClick={() => setFilterMachineTypeId('')}
+          className={`px-2.5 py-1 rounded-full text-xs font-bold transition-colors ${
+            filterMachineTypeId === '' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+          }`}
+        >
+          Все типы
+        </button>
+        {machineTypes.map((mt) => (
+          <button
+            key={mt.id}
+            onClick={() => setFilterMachineTypeId(mt.id === filterMachineTypeId ? '' : mt.id)}
+            className={`px-2.5 py-1 rounded-full text-xs font-bold transition-colors ${
+              filterMachineTypeId === mt.id
+                ? 'bg-indigo-600 text-white'
+                : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+            }`}
+          >
+            {mt.name}
           </button>
         ))}
       </div>

@@ -192,6 +192,9 @@ export interface BatchInsights {
   scriptSuggestions: string[];
   machineTypeBreakdown: Record<string, number>;
   usedModel?: string;
+  // Article-oriented batch analysis (optional)
+  articleTopicSuggestions?: string[];
+  topPainPoints?: string[];
 }
 
 export interface ExtractedDialogueData {
@@ -201,4 +204,59 @@ export interface ExtractedDialogueData {
   formulations: string[];
   techniques: string[];
   suggestedMicroPresentations: Array<Omit<MicroPresentation, 'id'>>;
+  // Article-oriented extraction (optional, populated when article analysis requested)
+  articleTopics?: string[];
+  painPoints?: string[];
+  styleMarkers?: string[];
+}
+
+export interface CleaningConfig {
+  geminiPrompt: string;
+  openaiPrompt: string;
+  geminiModel?: string;
+  openaiModel?: string;
+}
+
+export interface StyleDNA {
+  id: string;
+  generatedAt: string;
+  dialogueCount: number;
+  frequentPhrases: string[];
+  avgSentenceLength: 'short' | 'medium' | 'long';
+  tone: string;
+  thoughtStructure: string;
+  additionalNotes?: string;
+  usedModel?: string;
+}
+
+export interface FewShotExample {
+  id: string;
+  title: string;
+  content: string;
+  addedAt: string;
+}
+
+export interface Article {
+  id: string;
+  title: string;
+  content: string;
+  tags: string[];
+  status: 'draft' | 'published';
+  createdAt: string;
+  updatedAt: string;
+  wordpressPostId?: number;
+  wordpressUrl?: string;
+  generationMeta?: {
+    topic: string;
+    usedStyleDNA: boolean;
+    fewShotCount: number;
+    draftModel?: string;
+    rewriteModel?: string;
+  };
+}
+
+export interface WordPressConfig {
+  siteUrl: string;
+  username: string;
+  appPassword: string;
 }

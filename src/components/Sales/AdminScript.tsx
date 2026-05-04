@@ -19,7 +19,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 };
 
 export const AdminScript: React.FC = () => {
-  const { scriptNodes, microPresentations, addScriptNode, updateScriptNode, deleteScriptNode, saveScriptNodes } =
+  const { scriptNodes, microPresentations, machineTypes, addScriptNode, updateScriptNode, deleteScriptNode, saveScriptNodes } =
     useSalesStore();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [dragId, setDragId] = useState<string | null>(null);
@@ -76,6 +76,14 @@ export const AdminScript: React.FC = () => {
       ? currentIds.filter((x) => x !== mpId)
       : [...currentIds, mpId];
     updateScriptNode(nodeId, { microPresentationIds: next });
+  };
+
+  const toggleMachineType = (nodeId: string, currentIds: string[] | undefined, typeId: string) => {
+    const ids = currentIds ?? [];
+    const next = ids.includes(typeId)
+      ? ids.filter((x) => x !== typeId)
+      : [...ids, typeId];
+    updateScriptNode(nodeId, { machineTypeIds: next });
   };
 
   // Drag-and-drop handlers
@@ -196,6 +204,32 @@ export const AdminScript: React.FC = () => {
                   })}
                 </div>
               </div>
+
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-2">
+                  Типы станков (пусто = универсальный для всех)
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {machineTypes.map((mt) => {
+                    const active = (node.machineTypeIds ?? []).includes(mt.id);
+                    return (
+                      <button
+                        key={mt.id}
+                        onClick={() => toggleMachineType(node.id, node.machineTypeIds, mt.id)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors border ${
+                          active
+                            ? 'bg-calidad-blue text-white border-calidad-blue ring-2 ring-offset-1 ring-blue-500'
+                            : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'
+                        }`}
+                        title={mt.description}
+                      >
+                        {mt.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               <div>
                 <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">
                   Текст скрипта / подсказки менеджеру

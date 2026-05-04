@@ -62,6 +62,93 @@ export async function extractBatchInsights(
   return apiCall<BatchInsights>('/extract-batch-insights', 'POST', { allExtracted, model, provider });
 }
 
-export async function listAvailableModels(): Promise<{ gemini: string[]; gpt: string[] }> {
-  return apiCall<{ gemini: string[]; gpt: string[] }>('/available-models', 'GET');
+/** Extract article-specific patterns (topics, pain points, style markers) from cleaned dialogue */
+export async function extractArticlePatterns(
+  cleanedText: string,
+  provider?: 'gemini' | 'openai',
+  model?: string,
+): Promise<{ articleTopics: string[]; painPoints: string[]; styleMarkers: string[] }> {
+  return apiCall<{ articleTopics: string[]; painPoints: string[]; styleMarkers: string[] }>(
+    '/extract-article-patterns',
+    'POST',
+    { cleanedText, provider, model }
+  );
+}
+
+/** Extract article topic suggestions and top pain points from batch of dialogues */
+export async function extractBatchArticleTopics(
+  allExtracted: ExtractedDialogueData[],
+  provider?: 'gemini' | 'openai',
+  model?: string,
+): Promise<{ articleTopicSuggestions: string[]; topPainPoints: string[] }> {
+  return apiCall<{ articleTopicSuggestions: string[]; topPainPoints: string[] }>(
+    '/extract-batch-article-topics',
+    'POST',
+    { allExtracted, provider, model }
+  );
+}
+
+/** Extract speaker's unique style characteristics (StyleDNA) from 3+ dialogue texts */
+export async function extractStyleDNA(
+  texts: string[],
+  provider?: 'gemini' | 'openai',
+  model?: string,
+): Promise<{
+  frequentPhrases: string[];
+  avgSentenceLength: 'short' | 'medium' | 'long';
+  tone: string;
+  thoughtStructure: string;
+  additionalNotes?: string;
+}> {
+  return apiCall<{
+    frequentPhrases: string[];
+    avgSentenceLength: 'short' | 'medium' | 'long';
+    tone: string;
+    thoughtStructure: string;
+    additionalNotes?: string;
+  }>(
+    '/extract-style-dna',
+    'POST',
+    { texts, provider, model }
+  );
+}
+
+/** Generate initial article draft from topic and extracted patterns */
+export async function generateArticleDraft(
+  topic: string,
+  patterns: { painPoints: string[]; articleTopics: string[] },
+  provider?: 'gemini' | 'openai',
+  model?: string,
+): Promise<string> {
+  const result = await apiCall<{ draft: string }>(
+    '/generate-article-draft',
+    'POST',
+    { topic, patterns, provider, model }
+  );
+  return result.draft;
+}
+
+/** Rewrite article draft in speaker's unique style using StyleDNA and few-shot examples */
+export async function rewriteArticleInStyle(
+  draft: string,
+  styleDNA: { frequentPhrases: string[]; tone: string; thoughtStructure: string },
+  fewShots?: Array<{ title: string; content: string }>,
+  provider?: 'gemini' | 'openai',
+  model?: string,
+): Promise<string> {
+  const result = await apiCall<{ styledContent: string }>(
+    '/rewrite-article-style',
+    'POST',
+    { draft, styleDNA, fewShots, provider, model }
+  );
+  return result.styledContent;
+}
+
+export async function listAvailableModels(): Promise<string[]> {
+  const result = await apiCall<{ gemini: string[]; gpt: string[] }>('/available-models', 'GET');
+  return result.gemini || [];
+}
+
+export function listGptModels(): string[] {
+  return ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-3.5-turbo'];
 }

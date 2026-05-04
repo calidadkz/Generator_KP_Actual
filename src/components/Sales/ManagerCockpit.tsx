@@ -18,14 +18,16 @@ interface ManagerCockpitProps {
 export const ManagerCockpit: React.FC<ManagerCockpitProps> = ({ onBack }) => {
   const { machineTypes, scriptNodes, microPresentations } = useSalesStore();
 
-  const [selectedMachineTypeId, setSelectedMachineTypeId] = useState<string | null>(null);
+  const [clientMachineTypeIds, setClientMachineTypeIds] = useState<string[]>([]);
+  const [focusMachineTypeId, setFocusMachineTypeId] = useState<string | null>(null);
+  const [completedMachineTypeIds, setCompletedMachineTypeIds] = useState<string[]>([]);
   const [currentStepId, setCurrentStepId] = useState<string | null>(null);
   const [completedStepIds, setCompletedStepIds] = useState<Set<string>>(new Set());
   const [expandedStepIds, setExpandedStepIds] = useState<Set<string>>(new Set());
   const [expandedMpIds, setExpandedMpIds] = useState<Set<string>>(new Set());
 
   const sorted: ScriptNode[] = [...scriptNodes]
-    .filter((n) => !selectedMachineTypeId || !n.machineTypeIds?.length || n.machineTypeIds.includes(selectedMachineTypeId))
+    .filter((n) => !focusMachineTypeId || !n.machineTypeIds?.length || n.machineTypeIds.includes(focusMachineTypeId))
     .sort((a, b) => a.order - b.order);
 
   const total = sorted.length;
@@ -37,7 +39,7 @@ export const ManagerCockpit: React.FC<ManagerCockpitProps> = ({ onBack }) => {
   const ALWAYS_SHOWN_CATEGORIES = new Set(['Общее', 'Формулировки']);
 
   const matchesMachineType = (mp: MicroPresentation) =>
-    !selectedMachineTypeId || !mp.machineTypeIds?.length || mp.machineTypeIds.includes(selectedMachineTypeId);
+    !focusMachineTypeId || !mp.machineTypeIds?.length || mp.machineTypeIds.includes(focusMachineTypeId);
 
   const relevantMps = (step: ScriptNode | null): MicroPresentation[] => {
     // No step selected — show only neutral categories
@@ -92,13 +94,34 @@ export const ManagerCockpit: React.FC<ManagerCockpitProps> = ({ onBack }) => {
   };
 
   const handleReset = () => {
-    setSelectedMachineTypeId(null);
+    setClientMachineTypeIds([]);
+    setFocusMachineTypeId(null);
+    setCompletedMachineTypeIds([]);
     setCurrentStepId(null);
     setCompletedStepIds(new Set());
     setExpandedStepIds(new Set());
   };
 
   const mps = relevantMps(currentStep);
+
+  // Auto-complete machine type when all steps are done
+  React.useEffect(() => {
+    if (
+      focusMachineTypeId &&
+      progressPct === 100 &&
+      !completedMachineTypeIds.includes(focusMachineTypeId)
+    ) {
+      setCompletedMachineTypeIds((prev) => [...prev, focusMachineTypeId]);
+      // Move to next uncompleted machine type, if any
+      const nextIncomplete = clientMachineTypeIds.find(
+        (mtId) => !completedMachineTypeIds.concat(focusMachineTypeId).includes(mtId)
+      );
+      if (nextIncomplete) {
+        setFocusMachineTypeId(nextIncomplete);
+        setCompletedStepIds(new Set());
+      }
+    }
+  }, [progressPct, focusMachineTypeId, completedMachineTypeIds, clientMachineTypeIds]);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -145,38 +168,97 @@ export const ManagerCockpit: React.FC<ManagerCockpitProps> = ({ onBack }) => {
       <div className="flex flex-1 overflow-hidden">
         {/* Left: Script */}
         <div className="w-[60%] flex flex-col border-r border-gray-200 overflow-hidden">
-          {/* Machine type selector */}
-          <div className="bg-white border-b border-gray-100 px-5 py-3 flex-shrink-0">
-            <div className="flex items-center gap-2 mb-2">
-              <Cpu size={14} className="text-gray-400" />
-              <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Тип станка</span>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
+          {/* Machine type selector — two phases */}
+          {clientMachineTypeIds.length === 0 ? (
+            /* Phase 1: Select client's machines */
+            <div className="bg-white border-b border-gray-100 px-5 py-4 flex-shrink-0">
+              <div className="flex items-center gap-2 mb-3">
+                <Cpu size={14} className="text-gray-400" />
+                <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Какие станки у клиента?</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                {machineTypes.map((mt) => (
+                  <button
+                    key={mt.id}
+                    onClick={() => setClientMachineTypeIds((prev) =>
+                      prev.includes(mt.id) ? prev.filter((x) => x !== mt.id) : [...prev, mt.id]
+                    )}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors ${
+                      clientMachineTypeIds.includes(mt.id)
+                        ? 'bg-calidad-blue text-white'
+                        : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                    }`}
+                  >
+                    {mt.name}
+                  </button>
+                ))}
+              </div>
               <button
-                onClick={() => setSelectedMachineTypeId(null)}
-                className={`px-2.5 py-1 rounded-full text-xs font-bold transition-colors ${
-                  selectedMachineTypeId === null
-                    ? 'bg-calidad-blue text-white'
-                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                onClick={() => {
+                  if (clientMachineTypeIds.length > 0) {
+                    setFocusMachineTypeId(clientMachineTypeIds[0]);
+                  }
+                }}
+                disabled={clientMachineTypeIds.length === 0}
+                className={`w-full px-4 py-2 rounded-lg text-xs font-bold transition-colors ${
+                  clientMachineTypeIds.length === 0
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-calidad-blue text-white hover:bg-blue-800'
                 }`}
               >
-                Все
+                Начать звонок
               </button>
-              {machineTypes.map((mt) => (
-                <button
-                  key={mt.id}
-                  onClick={() => setSelectedMachineTypeId(mt.id === selectedMachineTypeId ? null : mt.id)}
-                  className={`px-2.5 py-1 rounded-full text-xs font-bold transition-colors ${
-                    selectedMachineTypeId === mt.id
-                      ? 'bg-calidad-blue text-white'
-                      : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                  }`}
-                >
-                  {mt.name}
-                </button>
-              ))}
             </div>
-          </div>
+          ) : (
+            /* Phase 2: During call — show client's machines + focus selector */
+            <div className="bg-white border-b border-gray-100 px-5 py-3 flex-shrink-0">
+              <div className="mb-3">
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">У клиента:</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {clientMachineTypeIds.map((mtId) => {
+                    const isCompleted = completedMachineTypeIds.includes(mtId);
+                    return (
+                      <button
+                        key={mtId}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors ${
+                          isCompleted
+                            ? 'bg-green-100 text-green-700 opacity-70'
+                            : focusMachineTypeId === mtId
+                            ? 'bg-calidad-blue text-white'
+                            : 'bg-gray-100 text-gray-500'
+                        }`}
+                        onClick={() => {
+                          if (!isCompleted) setFocusMachineTypeId(mtId);
+                        }}
+                      >
+                        {isCompleted ? '✓ ' : ''}{machineTypes.find((mt) => mt.id === mtId)?.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div>
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Прорабатываем:</p>
+                <select
+                  value={focusMachineTypeId ?? ''}
+                  onChange={(e) => setFocusMachineTypeId(e.target.value || null)}
+                  className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-bold bg-white focus:outline-none focus:border-calidad-blue"
+                >
+                  <option value="">Выберите тип...</option>
+                  {clientMachineTypeIds
+                    .filter((mtId) => !completedMachineTypeIds.includes(mtId))
+                    .map((mtId) => {
+                      const mt = machineTypes.find((m) => m.id === mtId);
+                      return (
+                        <option key={mtId} value={mtId}>
+                          {mt?.name}
+                        </option>
+                      );
+                    })}
+                </select>
+              </div>
+            </div>
+          )}
 
           {/* Script steps */}
           <div className="flex-1 overflow-y-auto p-4 space-y-2">
