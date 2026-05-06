@@ -169,21 +169,21 @@ TemplateMapper.tsx                GeneratorPage.tsx
 
 | Проект | ID | Назначение | Статус |
 |---|---|---|---|
-| **Calidad Supply (Firebase)** | `gen-lang-client-0038297950` | Cloud Run (asia-east1) + Firestore (asia-east2, databasekp) | ✅ АКТИВНЫЙ |
-| ~~Generator KP~~ | ~~gen-lang-client-0496465292~~ | ~~Устаревший (была API здесь)~~ | ❌ DEPRECATED |
+| **Calidad Supply (Firebase) - TIER 1** | `gen-lang-client-0496465292` | Cloud Run (asia-east2) + Firestore (asia-east2, databasekp) | ✅ АКТИВНЫЙ |
+| ~~Old Project~~ | ~~gen-lang-client-0038297950~~ | ~~Временный (для тестирования)~~ | ❌ DEPRECATED |
 
 ### ✅ Deploy Command (ТЕКУЩИЙ)
 
 ```bash
-gcloud run deploy generator-kp --source . --region asia-east1 \
-  --project gen-lang-client-0038297950 \
+gcloud run deploy generator-kp --source . --region asia-east2 \
+  --project gen-lang-client-0496465292 \
   --set-secrets=GEMINI_API_KEY=GEMINI_API_KEY:8 \
   --set-secrets=OPENAI_API_KEY=OPENAI_API_KEY:latest \
   --allow-unauthenticated
 ```
 
-**Cloud Run URL:** https://generator-kp-225103227035.asia-east1.run.app  
-**Firestore Database:** `databasekp` в `gen-lang-client-0038297950` (asia-east2)  
+**Cloud Run URL:** (будет обновлен после деплоя в asia-east2)  
+**Firestore Database:** `databasekp` в `gen-lang-client-0496465292` (asia-east2, Hong Kong)  
 **Status:** ✅ 35 Gemini моделей + 4 GPT модели, Firestore sync активен (27 апреля 2026)
 
 ### 🔐 Runtime Secrets Architecture (апрель 2026)
@@ -287,21 +287,25 @@ Node.js Express (port 8080)
 
 ### Firebase roadmap (следующий этап)
 
--### 🗄️ Database Infrastructure (Google Cloud)
-- **Project ID:** "gen-lang-client-0038297950",
+### 🗄️ Database Infrastructure (Google Cloud - TIER 1)
+- **Project ID:** "gen-lang-client-0496465292" (asia-east2 — Hong Kong)
 - **Database ID:** `databasekp`
 - **Location:** `asia-east2` (Hong Kong)
 - **Edition:** Standard (Firestore Native Mode)
 - **Security Rules:** Open (Test Mode — до 28 мая 2026)
 - **Target Collection:** `processed_scripts`
+
+```typescript
 const firebaseConfig = {
-  apiKey: "AIzaSyBaBRu2gm_UM49VDVQ0Q2EYN9k-2N4uXUo",
-  authDomain: "gen-lang-client-0038297950.firebaseapp.com",
-  projectId: "gen-lang-client-0038297950",
-  storageBucket: "gen-lang-client-0038297950.firebasestorage.app",
-  messagingSenderId: "225103227035",
-  appId: "1:225103227035:web:0020220f53c8ca15ac3e3e"
+  // Get these from Firebase Console → gen-lang-client-0496465292 → Project Settings
+  apiKey: "YOUR_API_KEY",
+  authDomain: "gen-lang-client-0496465292.firebaseapp.com",
+  projectId: "gen-lang-client-0496465292",
+  storageBucket: "gen-lang-client-0496465292.firebasestorage.app",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
 };
+```
 ---
 
 ## Идеи и концепции (добавляй сюда)

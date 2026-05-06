@@ -6,8 +6,8 @@ on:
       - main
 
 env:
-  PROJECT_ID: gen-lang-client-0038297950
-  REGION: asia-east1
+  PROJECT_ID: gen-lang-client-0496465292
+  REGION: asia-east2
   SERVICE_NAME: generator-kp
   REPO_NAME: calidad
 
@@ -27,7 +27,7 @@ jobs:
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: projects/225103227035/locations/global/workloadIdentityProviders/github-provider
-          service_account: cloud-run-deployer@gen-lang-client-0038297950.iam.gserviceaccount.com
+          service_account: cloud-run-deployer@gen-lang-client-0496465292.iam.gserviceaccount.com
 
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
