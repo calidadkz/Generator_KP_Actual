@@ -12,6 +12,7 @@ import {
   CleaningConfig,
 } from '../types';
 import { deleteDialogueTexts, saveDialogueTexts } from '../lib/dialogueStorage';
+import { cloudSyncManager } from '../lib/cloudSyncManager';
 
 const defaultCleaningConfig: CleaningConfig = {
   geminiPrompt: `Это расшифровка телефонного разговора. Исправь ТОЛЬКО явные ошибки распознавания речи:
@@ -219,6 +220,7 @@ interface SalesStore {
   deleteMachineType: (id: string) => void;
 
   saveScriptNodes: (nodes: ScriptNode[]) => void;
+  _loadScriptNodes: (nodes: ScriptNode[]) => void; // Direct load without sync
   addScriptNode: (node: ScriptNode) => void;
   updateScriptNode: (id: string, patch: Partial<ScriptNode>) => void;
   deleteScriptNode: (id: string) => void;
@@ -226,6 +228,9 @@ interface SalesStore {
   addMicroPresentation: (mp: MicroPresentation) => void;
   updateMicroPresentation: (id: string, patch: Partial<MicroPresentation>) => void;
   deleteMicroPresentation: (id: string) => void;
+  _loadMicroPresentations: (mp: MicroPresentation[]) => void; // Direct load without sync
+
+  _loadMachineTypes: (types: MachineType[]) => void; // Direct load without sync
 
   addDialogue: (d: DialogueRecord) => void;
   updateDialogue: (id: string, patch: Partial<DialogueRecord>) => void;
@@ -247,6 +252,11 @@ interface SalesStore {
   deleteFewShotExample: (id: string) => void;
   updateCleaningConfig: (patch: Partial<CleaningConfig>) => void;
 
+  // Direct loaders for cloud sync (bypass sync to avoid circular updates)
+  _loadArticles: (articles: Article[]) => void;
+  _loadFewShotExamples: (examples: FewShotExample[]) => void;
+  _loadCleaningConfig: (config: CleaningConfig) => void;
+
   migrateOldDialogues: () => Promise<void>;
 }
 
@@ -264,36 +274,67 @@ export const useSalesStore = create<SalesStore>()(
       cleaningConfig: defaultCleaningConfig,
 
       addMachineType: (t) =>
-        set((s) => ({ machineTypes: [...s.machineTypes, t] })),
+        set((s) => {
+          const updated = [...s.machineTypes, t];
+          cloudSyncManager.queueSync({ type: 'machineTypes', data: updated });
+          return { machineTypes: updated };
+        }),
       updateMachineType: (id, patch) =>
-        set((s) => ({
-          machineTypes: s.machineTypes.map((m) => (m.id === id ? { ...m, ...patch } : m)),
-        })),
+        set((s) => {
+          const updated = s.machineTypes.map((m) => (m.id === id ? { ...m, ...patch } : m));
+          cloudSyncManager.queueSync({ type: 'machineTypes', data: updated });
+          return { machineTypes: updated };
+        }),
       deleteMachineType: (id) =>
-        set((s) => ({ machineTypes: s.machineTypes.filter((m) => m.id !== id) })),
+        set((s) => {
+          const updated = s.machineTypes.filter((m) => m.id !== id);
+          cloudSyncManager.queueSync({ type: 'machineTypes', data: updated });
+          return { machineTypes: updated };
+        }),
 
-      saveScriptNodes: (nodes) => set({ scriptNodes: nodes }),
+      saveScriptNodes: (nodes) => {
+        set({ scriptNodes: nodes });
+        cloudSyncManager.queueSync({ type: 'scriptNodes', data: nodes });
+      },
       addScriptNode: (node) =>
-        set((s) => ({ scriptNodes: [...s.scriptNodes, node] })),
+        set((s) => {
+          const updated = [...s.scriptNodes, node];
+          cloudSyncManager.queueSync({ type: 'scriptNodes', data: updated });
+          return { scriptNodes: updated };
+        }),
       updateScriptNode: (id, patch) =>
-        set((s) => ({
-          scriptNodes: s.scriptNodes.map((n) => (n.id === id ? { ...n, ...patch } : n)),
-        })),
+        set((s) => {
+          const updated = s.scriptNodes.map((n) => (n.id === id ? { ...n, ...patch } : n));
+          cloudSyncManager.queueSync({ type: 'scriptNodes', data: updated });
+          return { scriptNodes: updated };
+        }),
       deleteScriptNode: (id) =>
-        set((s) => ({ scriptNodes: s.scriptNodes.filter((n) => n.id !== id) })),
+        set((s) => {
+          const updated = s.scriptNodes.filter((n) => n.id !== id);
+          cloudSyncManager.queueSync({ type: 'scriptNodes', data: updated });
+          return { scriptNodes: updated };
+        }),
 
       addMicroPresentation: (mp) =>
-        set((s) => ({ microPresentations: [...s.microPresentations, mp] })),
+        set((s) => {
+          const updated = [...s.microPresentations, mp];
+          cloudSyncManager.queueSync({ type: 'microPresentations', data: updated });
+          return { microPresentations: updated };
+        }),
       updateMicroPresentation: (id, patch) =>
-        set((s) => ({
-          microPresentations: s.microPresentations.map((mp) =>
+        set((s) => {
+          const updated = s.microPresentations.map((mp) =>
             mp.id === id ? { ...mp, ...patch } : mp,
-          ),
-        })),
+          );
+          cloudSyncManager.queueSync({ type: 'microPresentations', data: updated });
+          return { microPresentations: updated };
+        }),
       deleteMicroPresentation: (id) =>
-        set((s) => ({
-          microPresentations: s.microPresentations.filter((mp) => mp.id !== id),
-        })),
+        set((s) => {
+          const updated = s.microPresentations.filter((mp) => mp.id !== id);
+          cloudSyncManager.queueSync({ type: 'microPresentations', data: updated });
+          return { microPresentations: updated };
+        }),
 
       addDialogue: (d) =>
         set((s) => ({ dialogues: [...s.dialogues, d] })),
@@ -311,40 +352,78 @@ export const useSalesStore = create<SalesStore>()(
       setDialogues: (dialogues) => set({ dialogues }),
 
       addBatchInsight: (bi) =>
-        set((s) => ({ batchInsights: [bi, ...s.batchInsights] })),
+        set((s) => {
+          const updated = [bi, ...s.batchInsights];
+          cloudSyncManager.queueSync({ type: 'batchInsights', data: bi });
+          return { batchInsights: updated };
+        }),
       deleteBatchInsight: (id) =>
         set((s) => ({ batchInsights: s.batchInsights.filter((b) => b.id !== id) })),
       setBatchInsights: (insights) => set({ batchInsights: insights }),
 
       addArticle: (a) =>
-        set((s) => ({ articles: [...s.articles, a] })),
+        set((s) => {
+          const updated = [...s.articles, a];
+          cloudSyncManager.queueSync({ type: 'articles', data: updated });
+          return { articles: updated };
+        }),
       updateArticle: (id, patch) =>
-        set((s) => ({
-          articles: s.articles.map((a) => (a.id === id ? { ...a, ...patch } : a)),
-        })),
+        set((s) => {
+          const updated = s.articles.map((a) => (a.id === id ? { ...a, ...patch } : a));
+          cloudSyncManager.queueSync({ type: 'articles', data: updated });
+          return { articles: updated };
+        }),
       deleteArticle: (id) =>
-        set((s) => ({ articles: s.articles.filter((a) => a.id !== id) })),
+        set((s) => {
+          const updated = s.articles.filter((a) => a.id !== id);
+          cloudSyncManager.queueSync({ type: 'articles', data: updated });
+          return { articles: updated };
+        }),
 
-      setStyleDNA: (dna) => set({ styleDNA: dna }),
-      clearStyleDNA: () => set({ styleDNA: null }),
+      setStyleDNA: (dna) => {
+        set({ styleDNA: dna });
+        cloudSyncManager.queueSync({ type: 'styleDNA', data: dna });
+      },
+      clearStyleDNA: () => {
+        set({ styleDNA: null });
+        cloudSyncManager.queueSync({ type: 'styleDNA', data: null });
+      },
 
       addFewShotExample: (ex) =>
-        set((s) => ({ fewShotExamples: [...s.fewShotExamples, ex] })),
+        set((s) => {
+          const updated = [...s.fewShotExamples, ex];
+          cloudSyncManager.queueSync({ type: 'fewShotExamples', data: updated });
+          return { fewShotExamples: updated };
+        }),
       updateFewShotExample: (id, patch) =>
-        set((s) => ({
-          fewShotExamples: s.fewShotExamples.map((ex) =>
+        set((s) => {
+          const updated = s.fewShotExamples.map((ex) =>
             ex.id === id ? { ...ex, ...patch } : ex,
-          ),
-        })),
+          );
+          cloudSyncManager.queueSync({ type: 'fewShotExamples', data: updated });
+          return { fewShotExamples: updated };
+        }),
       deleteFewShotExample: (id) =>
-        set((s) => ({
-          fewShotExamples: s.fewShotExamples.filter((ex) => ex.id !== id),
-        })),
+        set((s) => {
+          const updated = s.fewShotExamples.filter((ex) => ex.id !== id);
+          cloudSyncManager.queueSync({ type: 'fewShotExamples', data: updated });
+          return { fewShotExamples: updated };
+        }),
 
       updateCleaningConfig: (patch) =>
-        set((s) => ({
-          cleaningConfig: { ...s.cleaningConfig, ...patch },
-        })),
+        set((s) => {
+          const updated = { ...s.cleaningConfig, ...patch };
+          cloudSyncManager.queueSync({ type: 'cleaningConfig', data: updated });
+          return { cleaningConfig: updated };
+        }),
+
+      // Direct loaders for cloud sync (bypass sync to avoid circular updates)
+      _loadScriptNodes: (nodes) => set({ scriptNodes: nodes }),
+      _loadMicroPresentations: (mp) => set({ microPresentations: mp }),
+      _loadMachineTypes: (types) => set({ machineTypes: types }),
+      _loadArticles: (articles) => set({ articles }),
+      _loadFewShotExamples: (examples) => set({ fewShotExamples: examples }),
+      _loadCleaningConfig: (config) => set({ cleaningConfig: config }),
 
       migrateOldDialogues: async () => {
         const dialogues = get().dialogues;
