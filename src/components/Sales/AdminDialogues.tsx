@@ -984,11 +984,11 @@ export const AdminDialogues: React.FC = () => {
                       )}
                     </div>
 
-                    {d.extractedData.conversationSteps.length > 0 && (
+                    {(d.extractedData.conversationSteps?.length ?? 0) > 0 && (
                       <div className="px-4 py-3">
                         <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Этапы разговора</p>
                         <div className="space-y-2">
-                          {d.extractedData.conversationSteps.map((step, i) => {
+                          {(d.extractedData.conversationSteps ?? []).map((step, i) => {
                             const pickerKey = `${d.id}-step-${i}`;
                             const isDone = addedStepKeys.has(pickerKey);
                             const isDup = dupFlashKeys.has(pickerKey);
@@ -1057,11 +1057,11 @@ export const AdminDialogues: React.FC = () => {
                       </div>
                     )}
 
-                    {d.extractedData.formulations.length > 0 && (
+                    {(d.extractedData.formulations?.length ?? 0) > 0 && (
                       <div className="px-4 py-3">
                         <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Удачные формулировки</p>
                         <ul className="space-y-1">
-                          {d.extractedData.formulations.map((f, i) => (
+                          {(d.extractedData.formulations ?? []).map((f, i) => (
                             <li key={i} className="text-xs text-gray-600 flex items-start gap-1.5">
                               <span className="text-calidad-blue mt-0.5 flex-shrink-0">›</span> {f}
                             </li>
@@ -1070,22 +1070,22 @@ export const AdminDialogues: React.FC = () => {
                       </div>
                     )}
 
-                    {d.extractedData.techniques.length > 0 && (
+                    {(d.extractedData.techniques?.length ?? 0) > 0 && (
                       <div className="px-4 py-3">
                         <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Техники продаж</p>
                         <div className="flex flex-wrap gap-1.5">
-                          {d.extractedData.techniques.map((t, i) => (
+                          {(d.extractedData.techniques ?? []).map((t, i) => (
                             <span key={i} className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full text-xs font-bold">{t}</span>
                           ))}
                         </div>
                       </div>
                     )}
 
-                    {d.extractedData.suggestedMicroPresentations.length > 0 && (
+                    {(d.extractedData.suggestedMicroPresentations?.length ?? 0) > 0 && (
                       <div className="px-4 py-3">
                         <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Предложенные мини-презентации</p>
                         <div className="space-y-2">
-                          {d.extractedData.suggestedMicroPresentations.map((mp, i) => {
+                          {(d.extractedData.suggestedMicroPresentations ?? []).map((mp, i) => {
                             const key = `${d.id}-${i}`;
                             const done = acceptedKeys.has(key);
                             const isDup = dupFlashKeys.has(key);
