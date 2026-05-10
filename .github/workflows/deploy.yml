@@ -7,8 +7,8 @@ on:
 
 env:
   PROJECT_ID: gen-lang-client-0496465292
-  REGION: asia-east2
-  SERVICE_NAME: generator-kp
+  REGION: us-central1
+  SERVICE_NAME: calidad-generator
   REPO_NAME: calidad
 
 jobs:
