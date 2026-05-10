@@ -169,7 +169,7 @@ TemplateMapper.tsx                GeneratorPage.tsx
 
 | Проект | ID | Назначение | Статус |
 |---|---|---|---|
-| **Calidad Supply (Firebase) - TIER 1** | `gen-lang-client-0496465292` | Cloud Run (asia-east2) + Firestore (asia-east2, databasekp) | ✅ АКТИВНЫЙ |
+| **Calidad Supply (Firebase) - TIER 1** | `gen-lang-client-0496465292` | Cloud Run (asia-east2) + Firestore (asia-east2, databasekp0496465292) | ✅ АКТИВНЫЙ |
 | ~~Old Project~~ | ~~gen-lang-client-0038297950~~ | ~~Временный (для тестирования)~~ | ❌ DEPRECATED |
 
 ### ✅ Deploy Command (ТЕКУЩИЙ)
@@ -183,7 +183,7 @@ gcloud run deploy generator-kp --source . --region asia-east2 \
 ```
 
 **Cloud Run URL:** (будет обновлен после деплоя в asia-east2)  
-**Firestore Database:** `databasekp` в `gen-lang-client-0496465292` (asia-east2, Hong Kong)  
+**Firestore Database:** `databasekp0496465292` в `gen-lang-client-0496465292` (asia-east2, Hong Kong)  
 **Status:** ✅ 35 Gemini моделей + 4 GPT модели, Firestore sync активен (27 апреля 2026)
 
 ### 🔐 Runtime Secrets Architecture (апрель 2026)
@@ -289,7 +289,7 @@ Node.js Express (port 8080)
 
 ### 🗄️ Database Infrastructure (Google Cloud - TIER 1)
 - **Project ID:** "gen-lang-client-0496465292" (asia-east2 — Hong Kong)
-- **Database ID:** `databasekp`
+- **Database ID:** `databasekp0496465292`
 - **Location:** `asia-east2` (Hong Kong)
 - **Edition:** Standard (Firestore Native Mode)
 - **Security Rules:** Open (Test Mode — до 28 мая 2026)
