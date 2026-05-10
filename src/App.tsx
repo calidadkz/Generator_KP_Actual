@@ -1,4 +1,27 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Component, ReactNode } from 'react';
+
+class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  state = { error: null };
+  static getDerivedStateFromError(error: Error) { return { error }; }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ padding: 32, fontFamily: 'monospace' }}>
+          <h2 style={{ color: 'red' }}>Ошибка приложения</h2>
+          <pre style={{ background: '#fee', padding: 16, borderRadius: 8, overflow: 'auto', fontSize: 12 }}>
+            {(this.state.error as Error).message}
+            {'\n\n'}
+            {(this.state.error as Error).stack}
+          </pre>
+          <button onClick={() => window.location.reload()} style={{ marginTop: 16, padding: '8px 16px' }}>
+            Перезагрузить
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 import { AppTab } from './types';
 import { Layout } from './components/UI/Layout';
 import { ContractSidebar } from './components/Contract/ContractSidebar';
@@ -34,7 +57,7 @@ const VALID_TABS: AppTab[] = [
   'sales-admin',
 ];
 
-export default function App() {
+function AppInner() {
   const [activeTab, setActiveTab] = useState<AppTab>(() => {
     const saved = localStorage.getItem('calidad_active_tab');
     return VALID_TABS.includes(saved as AppTab) ? (saved as AppTab) : 'dashboard';
@@ -288,5 +311,13 @@ export default function App() {
       sidebar={renderSidebar()}
       preview={renderPreview()}
     />
+  );
+}
+
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <AppInner />
+    </ErrorBoundary>
   );
 }

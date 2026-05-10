@@ -107,7 +107,7 @@ export const StyleDNAPanel: React.FC = () => {
       </div>
 
       <div className="divide-y divide-gray-100">
-        {styleDNA.frequentPhrases.length > 0 && (
+        {(styleDNA.frequentPhrases?.length ?? 0) > 0 && (
           <div className="px-6 py-4">
             <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Характерные фразы</p>
             <div className="space-y-1">

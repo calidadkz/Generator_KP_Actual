@@ -90,11 +90,11 @@ export const AdminArticles: React.FC = () => {
 
                 {expanded[article.id] && (
                   <div className="px-4 pb-4 border-t border-gray-100 space-y-4">
-                    {article.tags.length > 0 && (
+                    {(article.tags?.length ?? 0) > 0 && (
                       <div>
                         <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Теги</p>
                         <div className="flex flex-wrap gap-1">
-                          {article.tags.map((tag, i) => (
+                          {(article.tags ?? []).map((tag, i) => (
                             <span key={i} className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded-full text-xs font-bold">
                               {tag}
                             </span>
