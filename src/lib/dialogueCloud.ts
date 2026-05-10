@@ -9,10 +9,17 @@ import {
   orderBy,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import { DialogueRecord, BatchInsights } from '../types';
+import { DialogueRecord, BatchInsights, ScriptNode, MicroPresentation, MachineType, Article, StyleDNA, CleaningConfig, FewShotExample } from '../types';
 
 const DIALOGUES_COLLECTION = 'processed_scripts';
 const BATCH_INSIGHTS_COLLECTION = 'batch_insights';
+const SCRIPT_NODES_COLLECTION = 'script_nodes';
+const MICRO_PRESENTATIONS_COLLECTION = 'micro_presentations';
+const MACHINE_TYPES_COLLECTION = 'machine_types';
+const ARTICLES_COLLECTION = 'articles';
+const STYLE_DNA_COLLECTION = 'style_dna';
+const CLEANING_CONFIG_COLLECTION = 'cleaning_config';
+const FEW_SHOT_EXAMPLES_COLLECTION = 'few_shot_examples';
 
 /**
  * Fetch all dialogues from Firestore at app startup
@@ -126,5 +133,234 @@ export async function fetchBatchInsights(): Promise<BatchInsights[]> {
   } catch (error) {
     console.error('Failed to fetch batch insights:', error);
     return [];
+  }
+}
+
+// ─── Script Nodes ───────────────────────────────────────────────────────────
+
+export async function fetchScriptNodes(): Promise<ScriptNode[]> {
+  try {
+    const q = query(collection(db, SCRIPT_NODES_COLLECTION), orderBy('order', 'asc'));
+    const snapshot = await getDocs(q);
+    const nodes: ScriptNode[] = [];
+
+    snapshot.forEach((docSnap) => {
+      nodes.push({
+        id: docSnap.id,
+        ...docSnap.data(),
+      } as ScriptNode);
+    });
+
+    return nodes;
+  } catch (error) {
+    console.error('Failed to fetch script nodes:', error);
+    return [];
+  }
+}
+
+export async function saveScriptNodes(nodes: ScriptNode[]): Promise<void> {
+  try {
+    for (const node of nodes) {
+      const docRef = doc(db, SCRIPT_NODES_COLLECTION, node.id);
+      await setDoc(docRef, node);
+    }
+    console.log(`Saved ${nodes.length} script nodes to Firestore`);
+  } catch (error) {
+    console.error('Failed to save script nodes:', error);
+    throw error;
+  }
+}
+
+// ─── Micro Presentations ───────────────────────────────────────────────────
+
+export async function fetchMicroPresentations(): Promise<MicroPresentation[]> {
+  try {
+    const snapshot = await getDocs(collection(db, MICRO_PRESENTATIONS_COLLECTION));
+    const presentations: MicroPresentation[] = [];
+
+    snapshot.forEach((docSnap) => {
+      presentations.push({
+        id: docSnap.id,
+        ...docSnap.data(),
+      } as MicroPresentation);
+    });
+
+    return presentations;
+  } catch (error) {
+    console.error('Failed to fetch micro presentations:', error);
+    return [];
+  }
+}
+
+export async function saveMicroPresentations(presentations: MicroPresentation[]): Promise<void> {
+  try {
+    for (const mp of presentations) {
+      const docRef = doc(db, MICRO_PRESENTATIONS_COLLECTION, mp.id);
+      await setDoc(docRef, mp);
+    }
+    console.log(`Saved ${presentations.length} micro presentations to Firestore`);
+  } catch (error) {
+    console.error('Failed to save micro presentations:', error);
+    throw error;
+  }
+}
+
+// ─── Machine Types ──────────────────────────────────────────────────────────
+
+export async function fetchMachineTypes(): Promise<MachineType[]> {
+  try {
+    const snapshot = await getDocs(collection(db, MACHINE_TYPES_COLLECTION));
+    const types: MachineType[] = [];
+
+    snapshot.forEach((docSnap) => {
+      types.push({
+        id: docSnap.id,
+        ...docSnap.data(),
+      } as MachineType);
+    });
+
+    return types;
+  } catch (error) {
+    console.error('Failed to fetch machine types:', error);
+    return [];
+  }
+}
+
+export async function saveMachineTypes(types: MachineType[]): Promise<void> {
+  try {
+    for (const type of types) {
+      const docRef = doc(db, MACHINE_TYPES_COLLECTION, type.id);
+      await setDoc(docRef, type);
+    }
+    console.log(`Saved ${types.length} machine types to Firestore`);
+  } catch (error) {
+    console.error('Failed to save machine types:', error);
+    throw error;
+  }
+}
+
+// ─── Articles ───────────────────────────────────────────────────────────────
+
+export async function fetchArticles(): Promise<Article[]> {
+  try {
+    const q = query(collection(db, ARTICLES_COLLECTION), orderBy('createdAt', 'desc'));
+    const snapshot = await getDocs(q);
+    const articles: Article[] = [];
+
+    snapshot.forEach((docSnap) => {
+      articles.push({
+        id: docSnap.id,
+        ...docSnap.data(),
+      } as Article);
+    });
+
+    return articles;
+  } catch (error) {
+    console.error('Failed to fetch articles:', error);
+    return [];
+  }
+}
+
+export async function saveArticles(articles: Article[]): Promise<void> {
+  try {
+    for (const article of articles) {
+      const docRef = doc(db, ARTICLES_COLLECTION, article.id);
+      await setDoc(docRef, article);
+    }
+    console.log(`Saved ${articles.length} articles to Firestore`);
+  } catch (error) {
+    console.error('Failed to save articles:', error);
+    throw error;
+  }
+}
+
+// ─── Style DNA ──────────────────────────────────────────────────────────────
+
+export async function fetchStyleDNA(): Promise<StyleDNA | null> {
+  try {
+    const snapshot = await getDocs(collection(db, STYLE_DNA_COLLECTION));
+    if (snapshot.empty) return null;
+
+    const doc = snapshot.docs[0];
+    return {
+      id: doc.id,
+      ...doc.data(),
+    } as StyleDNA;
+  } catch (error) {
+    console.error('Failed to fetch style DNA:', error);
+    return null;
+  }
+}
+
+export async function saveStyleDNA(dna: StyleDNA | null): Promise<void> {
+  try {
+    if (dna) {
+      const docRef = doc(db, STYLE_DNA_COLLECTION, dna.id);
+      await setDoc(docRef, dna);
+      console.log('Saved style DNA to Firestore');
+    }
+  } catch (error) {
+    console.error('Failed to save style DNA:', error);
+    throw error;
+  }
+}
+
+// ─── Cleaning Config ────────────────────────────────────────────────────────
+
+export async function fetchCleaningConfig(): Promise<CleaningConfig | null> {
+  try {
+    const snapshot = await getDocs(collection(db, CLEANING_CONFIG_COLLECTION));
+    if (snapshot.empty) return null;
+
+    const doc = snapshot.docs[0];
+    return doc.data() as CleaningConfig;
+  } catch (error) {
+    console.error('Failed to fetch cleaning config:', error);
+    return null;
+  }
+}
+
+export async function saveCleaningConfig(config: CleaningConfig): Promise<void> {
+  try {
+    const docRef = doc(db, CLEANING_CONFIG_COLLECTION, 'default');
+    await setDoc(docRef, config);
+    console.log('Saved cleaning config to Firestore');
+  } catch (error) {
+    console.error('Failed to save cleaning config:', error);
+    throw error;
+  }
+}
+
+// ─── Few Shot Examples ──────────────────────────────────────────────────────
+
+export async function fetchFewShotExamples(): Promise<FewShotExample[]> {
+  try {
+    const snapshot = await getDocs(collection(db, FEW_SHOT_EXAMPLES_COLLECTION));
+    const examples: FewShotExample[] = [];
+
+    snapshot.forEach((docSnap) => {
+      examples.push({
+        id: docSnap.id,
+        ...docSnap.data(),
+      } as FewShotExample);
+    });
+
+    return examples;
+  } catch (error) {
+    console.error('Failed to fetch few shot examples:', error);
+    return [];
+  }
+}
+
+export async function saveFewShotExamples(examples: FewShotExample[]): Promise<void> {
+  try {
+    for (const example of examples) {
+      const docRef = doc(db, FEW_SHOT_EXAMPLES_COLLECTION, example.id);
+      await setDoc(docRef, example);
+    }
+    console.log(`Saved ${examples.length} few shot examples to Firestore`);
+  } catch (error) {
+    console.error('Failed to save few shot examples:', error);
+    throw error;
   }
 }
