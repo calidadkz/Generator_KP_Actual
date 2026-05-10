@@ -195,11 +195,11 @@ function BatchInsightCard({
 
       {open && (
         <div className="divide-y divide-gray-100">
-          {insight.clientPortraits.length > 0 && (
+          {(insight.clientPortraits?.length ?? 0) > 0 && (
             <div className="px-4 py-3">
               <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Портреты клиентов</p>
               <ul className="space-y-1">
-                {insight.clientPortraits.map((p, i) => (
+                {(insight.clientPortraits ?? []).map((p, i) => (
                   <li key={i} className="text-xs text-gray-600 flex items-start gap-1.5">
                     <span className="text-indigo-500 mt-0.5 flex-shrink-0">›</span> {p}
                   </li>
@@ -207,11 +207,11 @@ function BatchInsightCard({
               </ul>
             </div>
           )}
-          {insight.topFormulations.length > 0 && (
+          {(insight.topFormulations?.length ?? 0) > 0 && (
             <div className="px-4 py-3">
               <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Топ формулировки</p>
               <div className="space-y-1.5">
-                {insight.topFormulations.map((f, i) => (
+                {(insight.topFormulations ?? []).map((f, i) => (
                   <div key={i} className="flex items-start justify-between gap-2 bg-gray-50 rounded-lg px-3 py-2">
                     <p className="text-xs text-gray-700 flex-1">{f}</p>
                     <button
@@ -225,21 +225,21 @@ function BatchInsightCard({
               </div>
             </div>
           )}
-          {insight.commonTechniques.length > 0 && (
+          {(insight.commonTechniques?.length ?? 0) > 0 && (
             <div className="px-4 py-3">
               <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Частые техники</p>
               <div className="flex flex-wrap gap-1.5">
-                {insight.commonTechniques.map((t, i) => (
+                {(insight.commonTechniques ?? []).map((t, i) => (
                   <span key={i} className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full text-xs font-bold">{t}</span>
                 ))}
               </div>
             </div>
           )}
-          {insight.scriptSuggestions.length > 0 && (
+          {(insight.scriptSuggestions?.length ?? 0) > 0 && (
             <div className="px-4 py-3">
               <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Рекомендации по скрипту</p>
               <div className="space-y-1.5">
-                {insight.scriptSuggestions.map((s, i) => (
+                {(insight.scriptSuggestions ?? []).map((s, i) => (
                   <div key={i} className="flex items-start justify-between gap-2 bg-gray-50 rounded-lg px-3 py-2">
                     <p className="text-xs text-gray-700 flex-1">{s}</p>
                     <button
@@ -253,11 +253,11 @@ function BatchInsightCard({
               </div>
             </div>
           )}
-          {Object.keys(insight.machineTypeBreakdown).length > 0 && (
+          {Object.keys(insight.machineTypeBreakdown ?? {}).length > 0 && (
             <div className="px-4 py-3">
               <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Запросы по типам станков</p>
               <div className="space-y-1">
-                {Object.entries(insight.machineTypeBreakdown)
+                {Object.entries(insight.machineTypeBreakdown ?? {})
                   .sort(([, a], [, b]) => b - a)
                   .map(([type, count]) => (
                     <div key={type} className="flex items-center justify-between">
