@@ -18,23 +18,23 @@ jobs:
       contents: read
 
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Authenticate to Google Cloud
+      - name: Auth
         uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
 
-      - name: Set up Cloud SDK
+      - name: Setup gcloud
         uses: google-github-actions/setup-gcloud@v2
 
-      - name: Deploy to Cloud Run
+      - name: Deploy
         run: |
-          gcloud run deploy ${{ env.SERVICE_NAME }} \
+          gcloud run deploy $SERVICE_NAME \
             --source . \
-            --region ${{ env.REGION }} \
-            --project ${{ env.PROJECT_ID }} \
+            --region $REGION \
+            --project $PROJECT_ID \
             --allow-unauthenticated \
             --set-secrets=GEMINI_API_KEY=GEMINI_API_KEY:latest \
             --set-secrets=OPENAI_API_KEY=OPENAI_API_KEY:latest \
