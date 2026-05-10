@@ -685,10 +685,10 @@ export const AdminDialogues: React.FC = () => {
   const handleCheckModels = async () => {
     setCheckingModels(true);
     try {
-      const { gemini, gpt } = await listAvailableModels();
-      setAvailableGeminiModels(gemini);
+      const gemini = await listAvailableModels();
+      setAvailableGeminiModels(gemini ?? []);
       setSelectedModel(null);
-      setSelectedProvider('gemini');
+      setSelectedProvider(gemini && gemini.length > 0 ? 'gemini' : 'openai');
     } catch {
       setAvailableGeminiModels([]);
     } finally {
