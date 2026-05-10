@@ -13,9 +13,10 @@ import {
   fetchStyleDNA,
   fetchCleaningConfig,
   fetchFewShotExamples,
+  DialogueWithTexts,
 } from '../lib/dialogueCloud';
 import { DialogueRecord } from '../types';
-import { resolveDialogueTexts } from '../lib/dialogueStorage';
+import { resolveDialogueTexts, saveDialogueTexts } from '../lib/dialogueStorage';
 
 /**
  * Hook to manage cloud synchronization for Sales module
@@ -160,13 +161,43 @@ export function useCloudSync() {
       ]);
 
       // Merge dialogues: cloud version takes precedence
+      // Also restore texts from Firestore into IndexedDB if missing locally
       if (cloudDialogues.length > 0) {
+        const restoredDialogues: DialogueRecord[] = [];
+
+        for (const cloud of cloudDialogues) {
+          const local = dialogues.find((l) => l.id === cloud.id);
+          const hasLocalText = local?.textRef
+            ? !!(await resolveDialogueTexts(local.textRef).catch(() => null))
+            : false;
+
+          // If Firestore has texts but IndexedDB doesn't — restore them
+          if (!hasLocalText && (cloud.rawText || cloud.cleanedText)) {
+            try {
+              const ref = await saveDialogueTexts({
+                rawText: cloud.rawText || '',
+                cleanedText: cloud.cleanedText || '',
+              });
+              const { rawText: _r, cleanedText: _c, ...meta } = cloud as DialogueWithTexts;
+              restoredDialogues.push({ ...meta, textRef: ref });
+              console.log(`[Cloud Sync] Restored texts for dialogue ${cloud.id}`);
+            } catch {
+              const { rawText: _r, cleanedText: _c, ...meta } = cloud as DialogueWithTexts;
+              restoredDialogues.push(meta as DialogueRecord);
+            }
+          } else {
+            const { rawText: _r, cleanedText: _c, ...meta } = cloud as DialogueWithTexts;
+            restoredDialogues.push(local ? { ...local, ...meta } : meta as DialogueRecord);
+          }
+        }
+
+        const newFromCloud = restoredDialogues.filter((c) => !dialogues.some((l) => l.id === c.id));
         const merged = dialogues.map((local) => {
-          const cloud = cloudDialogues.find((c) => c.id === local.id);
-          return cloud ? { ...local, ...cloud } : local;
+          const cloud = restoredDialogues.find((c) => c.id === local.id);
+          return cloud ?? local;
         });
-        const newFromCloud = cloudDialogues.filter((c) => !dialogues.some((l) => l.id === c.id));
         setDialogues([...merged, ...newFromCloud]);
+        console.log(`Synced ${cloudDialogues.length} dialogues from Firestore (texts restored where needed)`);
       }
 
       // Load other data if it exists in cloud

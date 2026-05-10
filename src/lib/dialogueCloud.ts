@@ -24,17 +24,22 @@ const FEW_SHOT_EXAMPLES_COLLECTION = 'few_shot_examples';
 /**
  * Fetch all dialogues from Firestore at app startup
  */
-export async function syncFromCloud(): Promise<DialogueRecord[]> {
+export type DialogueWithTexts = DialogueRecord & {
+  rawText?: string;
+  cleanedText?: string;
+};
+
+export async function syncFromCloud(): Promise<DialogueWithTexts[]> {
   try {
     const q = query(collection(db, DIALOGUES_COLLECTION), orderBy('uploadedAt', 'desc'));
     const snapshot = await getDocs(q);
-    const dialogues: DialogueRecord[] = [];
+    const dialogues: DialogueWithTexts[] = [];
 
     snapshot.forEach((docSnap) => {
       dialogues.push({
         id: docSnap.id,
         ...docSnap.data(),
-      } as DialogueRecord);
+      } as DialogueWithTexts);
     });
 
     return dialogues;
@@ -54,17 +59,20 @@ export async function uploadToCloud(
   try {
     const docRef = doc(db, DIALOGUES_COLLECTION, record.id);
 
-    // Remove undefined values and text fields (Firestore doesn't allow undefined)
     const cleanRecord = Object.fromEntries(
       Object.entries(record)
         .filter(([, v]) => v !== undefined)
-        .filter(([k]) => !['rawText', 'cleanedText', 'rawTextLegacy'].includes(k))
+        .filter(([k]) => !['rawTextLegacy'].includes(k))
     ) as DialogueRecord;
 
-    // Store metadata in Firestore (text stored separately in IndexedDB)
-    await setDoc(docRef, cleanRecord);
+    // Store metadata + texts in Firestore for cross-device persistence
+    await setDoc(docRef, {
+      ...cleanRecord,
+      rawText: dialogueTexts.rawText || '',
+      cleanedText: dialogueTexts.cleanedText || '',
+    });
 
-    console.log(`Uploaded dialogue ${record.id} to Firestore`);
+    console.log(`Uploaded dialogue ${record.id} to Firestore (with texts)`);
   } catch (error) {
     console.error(`Failed to upload dialogue ${record.id}:`, error);
     throw error;
