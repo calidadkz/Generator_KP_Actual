@@ -1,9 +1,16 @@
 import { BatchInsights, ExtractedDialogueData, ModelLogEntry } from '../types';
+import { classifyDialogue, preprocessTranscription } from '../lib/dialogueClassifier';
 
 export interface ProcessResult {
   data: ExtractedDialogueData;
   usedModel: string;
   log: ModelLogEntry[];
+}
+
+export interface DialogueClassificationResult {
+  type: 'real' | 'training' | 'educational';
+  confidence: 'high' | 'medium' | 'low';
+  indicators: string[];
 }
 
 async function apiCall<T>(endpoint: string, method: 'GET' | 'POST' = 'POST', body?: unknown): Promise<T> {
@@ -33,9 +40,26 @@ async function apiCall<T>(endpoint: string, method: 'GET' | 'POST' = 'POST', bod
   }
 }
 
+/** Preprocess raw transcription: remove artifacts, normalize structure */
+export function preprocessDialogueText(rawText: string): string {
+  return preprocessTranscription(rawText);
+}
+
+/** Classify dialogue as real/training/educational */
+export function classifyDialogueType(text: string): DialogueClassificationResult {
+  const result = classifyDialogue(text);
+  return {
+    type: result.type,
+    confidence: result.confidence,
+    indicators: result.indicators,
+  };
+}
+
 /** Step 1: quick AI cleaning of transcription artifacts, preserves style */
 export async function cleanDialogueText(rawText: string, provider?: 'gemini' | 'openai'): Promise<string> {
-  const { cleanedText } = await apiCall<{ cleanedText: string }>('/clean-text', 'POST', { rawText, provider });
+  // Preprocess first to remove common transcription artifacts
+  const preprocessed = preprocessDialogueText(rawText);
+  const { cleanedText } = await apiCall<{ cleanedText: string }>('/clean-text', 'POST', { rawText: preprocessed, provider });
   return cleanedText;
 }
 

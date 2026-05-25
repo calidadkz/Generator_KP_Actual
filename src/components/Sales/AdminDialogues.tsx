@@ -13,6 +13,8 @@ import {
   extractBatchInsights,
   extractArticlePatterns,
   listAvailableModels,
+  classifyDialogueType,
+  preprocessDialogueText,
 } from '../../services/dialogueProcessor';
 import { CleaningConfigEditor } from './CleaningConfigEditor';
 import {
@@ -20,6 +22,7 @@ import {
   saveDialogueTexts,
   updateDialogueTexts,
 } from '../../lib/dialogueStorage';
+import { getClassificationLabel, getConfidenceColor } from '../../lib/dialogueClassifier';
 import {
   BatchInsights,
   DialogueRecord,
@@ -146,6 +149,23 @@ function AnalysisBadge({ status }: { status: DialogueRecord['analysisStatus'] })
   return (
     <span className="flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-600 rounded-full text-[10px] font-bold border border-red-200">
       <AlertCircle size={9} /> Ошибка анализа
+    </span>
+  );
+}
+
+function DialogueTypeBadge({
+  type,
+  confidence,
+}: {
+  type?: DialogueRecord['dialogueType'];
+  confidence?: DialogueRecord['dialogueTypeConfidence'];
+}) {
+  if (!type) return null;
+  const label = getClassificationLabel(type);
+  const colorClass = confidence ? getConfidenceColor(confidence) : 'bg-gray-100 text-gray-700 border-gray-200';
+  return (
+    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${colorClass}`}>
+      {label}
     </span>
   );
 }
@@ -363,8 +383,15 @@ export const AdminDialogues: React.FC = () => {
   const startCleanPipeline = async (id: string, rawText: string) => {
     let ref: string;
     try {
+      // Classify dialogue type based on content
+      const classification = classifyDialogueType(rawText);
+
       ref = await saveDialogueTexts({ rawText, cleanedText: '' });
-      updateDialogue(id, { textRef: ref });
+      updateDialogue(id, {
+        textRef: ref,
+        dialogueType: classification.type,
+        dialogueTypeConfidence: classification.confidence,
+      });
     } catch {
       updateDialogue(id, { cleanStatus: 'error', cleanErrorMessage: 'Ошибка сохранения в хранилище' });
       return;
@@ -744,6 +771,7 @@ export const AdminDialogues: React.FC = () => {
                     <ShieldCheck size={9} /> Чистовой
                   </span>
                 )}
+                <DialogueTypeBadge type={d.dialogueType} confidence={d.dialogueTypeConfidence} />
                 <CleanBadge status={d.cleanStatus} />
                 <AnalysisBadge status={d.analysisStatus} />
               </div>
@@ -844,6 +872,28 @@ export const AdminDialogues: React.FC = () => {
               </button>
             </div>
           </div>
+
+          {/* Dialogue type selector */}
+          {d.cleanStatus !== 'pending' && (
+            <div className="mt-2 flex items-center gap-2">
+              <span className="text-xs text-gray-500 font-semibold">Тип:</span>
+              <select
+                value={d.dialogueType || ''}
+                onChange={(e) => updateDialogue(d.id, { dialogueType: (e.target.value as any) || undefined })}
+                className="px-2 py-1 text-xs bg-white border border-gray-300 rounded-lg text-gray-700 hover:border-gray-400 focus:outline-none focus:border-calidad-blue"
+              >
+                <option value="">Не определён</option>
+                <option value="real">📞 Реальный звонок</option>
+                <option value="training">🎓 Тренировка менеджера</option>
+                <option value="educational">📚 Обучающий материал</option>
+              </select>
+              {d.dialogueTypeConfidence && (
+                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${getConfidenceColor(d.dialogueTypeConfidence)}`}>
+                  {d.dialogueTypeConfidence === 'high' ? 'Уверен' : d.dialogueTypeConfidence === 'medium' ? 'Средне' : 'Низко'}
+                </span>
+              )}
+            </div>
+          )}
 
           {/* Machine type tags */}
           <div className="mt-2 flex flex-wrap gap-1.5 items-center">
@@ -1166,6 +1216,19 @@ export const AdminDialogues: React.FC = () => {
             Проверить ключ
           </button>
         </div>
+      </div>
+
+      {/* Info banner about classification */}
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs text-blue-700">
+        <p className="font-semibold flex items-start gap-2 mb-1">
+          <span>ℹ️</span>
+          <span>Диалоги автоматически классифицируются и предварительно обрабатываются:</span>
+        </p>
+        <ul className="ml-6 space-y-0.5 text-blue-600">
+          <li>✓ Определение типа: реальный звонок, тренировка менеджера или обучение</li>
+          <li>✓ Удаление артефактов транскрипции: метки времени, [паузы], [смех]</li>
+          <li>✓ Нормализация структуры текста и меток говорящего</li>
+        </ul>
       </div>
 
       {/* Duplicate upload warning */}

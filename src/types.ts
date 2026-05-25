@@ -132,6 +132,7 @@ export interface MachineType {
   name: string;
   description?: string;
   qualifiers?: string[];
+  siteUrl?: string;
 }
 
 export interface ScriptNode {
@@ -143,15 +144,73 @@ export interface ScriptNode {
   tips?: string[];
   machineTypeIds?: string[];
   microPresentationIds?: string[];
+  scriptType?: 'qualification' | 'closing' | 'calling';
 }
 
 export interface MicroPresentation {
   id: string;
   title: string;
-  content: string;
+  content: string;        // legacy — отображается если нет methodology
   category: string;
   machineTypeIds?: string[];
   tags?: string[];
+  // Три уровня атома знаний (модуль 06)
+  technical?: string;     // «Что» — технический факт (серый фон)
+  methodology?: string;   // «Как» — метод эксперта (голубой фон), приоритет над content
+  compromise?: string;    // «Если бюджет» — стратегия компромисса (янтарный фон)
+  // Управление публикацией
+  isPublished?: boolean;  // false = AI-черновик, не отображается менеджеру
+  createdBy?: 'human' | 'agent';
+  sourceDialogueIds?: string[];
+}
+
+export interface ClientPortrait {
+  id: string;
+  name: string;
+  description: string;
+  aiSummary?: string;
+  indicators: string[];       // маркеры в речи клиента
+  detectKeywords: string[];   // ключевые слова для авто-определения
+  typicalObjections: string[];
+  recommendedApproach: string;
+  pitfalls: string[];
+  recommendedMpIds: string[];
+  machineTypePreferences?: string[];
+  tags: string[];
+  isPublished: boolean;
+  sourceDialogueIds?: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type FeedbackNoteType = 'script_gap' | 'knowledge_gap' | 'dev_task' | 'unclear';
+
+export interface FeedbackNote {
+  id: string;
+  authorId: string;
+  authorName?: string;
+  text: string;
+  isPrivate: boolean;
+  isUrgent: boolean;
+  autoContext: {
+    source: 'cockpit' | 'trainer' | 'manual';
+    scriptType?: string;
+    stageName?: string;
+    machineTypeId?: string;
+    scriptNodeId?: string;
+  };
+  status: 'new' | 'agent_reviewed' | 'supervisor_review' | 'resolved' | 'rejected';
+  agentClassifications?: FeedbackNoteType[];
+  agentClassificationReason?: string;
+  agentProposal?: {
+    draftMpId?: string;
+    devPrompt?: string;
+    clarifyingQuestions?: string[];
+  };
+  supervisorComment?: string;
+  groupId?: string;
+  resolvedAt?: string;
+  createdAt: string;
 }
 
 export interface ModelLogEntry {
@@ -175,6 +234,9 @@ export interface DialogueRecord {
   machineTypeIds?: string[];  // manual tagging by operator
   isClean?: boolean;          // manually marked as final clean version
   extractedData?: ExtractedDialogueData;
+
+  dialogueType?: 'real' | 'training' | 'educational';  // real customer call, manager training, or educational material
+  dialogueTypeConfidence?: 'high' | 'medium' | 'low';   // confidence of automatic classification
 
   errorMessage?: string;
   cleanErrorMessage?: string;

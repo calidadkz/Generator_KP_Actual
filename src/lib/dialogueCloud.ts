@@ -9,7 +9,7 @@ import {
   orderBy,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import { DialogueRecord, BatchInsights, ScriptNode, MicroPresentation, MachineType, Article, StyleDNA, CleaningConfig, FewShotExample } from '../types';
+import { DialogueRecord, BatchInsights, ScriptNode, MicroPresentation, MachineType, Article, StyleDNA, CleaningConfig, FewShotExample, ClientPortrait, FeedbackNote } from '../types';
 
 const DIALOGUES_COLLECTION = 'processed_scripts';
 const BATCH_INSIGHTS_COLLECTION = 'batch_insights';
@@ -20,6 +20,8 @@ const ARTICLES_COLLECTION = 'articles';
 const STYLE_DNA_COLLECTION = 'style_dna';
 const CLEANING_CONFIG_COLLECTION = 'cleaning_config';
 const FEW_SHOT_EXAMPLES_COLLECTION = 'few_shot_examples';
+const CLIENT_PORTRAITS_COLLECTION = 'client_portraits';
+const FEEDBACK_NOTES_COLLECTION = 'feedback_notes';
 
 /**
  * Fetch all dialogues from Firestore at app startup
@@ -369,6 +371,100 @@ export async function saveFewShotExamples(examples: FewShotExample[]): Promise<v
     console.log(`Saved ${examples.length} few shot examples to Firestore`);
   } catch (error) {
     console.error('Failed to save few shot examples:', error);
+    throw error;
+  }
+}
+
+// ─── Client Portraits ───────────────────────────────────────────────────────
+
+export async function fetchClientPortraits(): Promise<ClientPortrait[]> {
+  try {
+    const q = query(collection(db, CLIENT_PORTRAITS_COLLECTION), orderBy('createdAt', 'asc'));
+    const snapshot = await getDocs(q);
+    const portraits: ClientPortrait[] = [];
+    snapshot.forEach((docSnap) => {
+      portraits.push({ id: docSnap.id, ...docSnap.data() } as ClientPortrait);
+    });
+    return portraits;
+  } catch (error) {
+    console.error('Failed to fetch client portraits:', error);
+    return [];
+  }
+}
+
+export async function saveClientPortrait(portrait: ClientPortrait): Promise<void> {
+  try {
+    const docRef = doc(db, CLIENT_PORTRAITS_COLLECTION, portrait.id);
+    await setDoc(docRef, portrait);
+  } catch (error) {
+    console.error('Failed to save client portrait:', error);
+    throw error;
+  }
+}
+
+export async function updateClientPortrait(id: string, patch: Partial<ClientPortrait>): Promise<void> {
+  try {
+    const docRef = doc(db, CLIENT_PORTRAITS_COLLECTION, id);
+    await updateDoc(docRef, patch);
+  } catch (error) {
+    console.error('Failed to update client portrait:', error);
+    throw error;
+  }
+}
+
+export async function deleteClientPortrait(id: string): Promise<void> {
+  try {
+    const docRef = doc(db, CLIENT_PORTRAITS_COLLECTION, id);
+    await deleteDoc(docRef);
+  } catch (error) {
+    console.error('Failed to delete client portrait:', error);
+    throw error;
+  }
+}
+
+// ─── Feedback Notes (Шестерёнка) ────────────────────────────────────────────
+
+export async function fetchFeedbackNotes(): Promise<FeedbackNote[]> {
+  try {
+    const q = query(collection(db, FEEDBACK_NOTES_COLLECTION), orderBy('createdAt', 'desc'));
+    const snapshot = await getDocs(q);
+    const notes: FeedbackNote[] = [];
+    snapshot.forEach((docSnap) => {
+      notes.push({ id: docSnap.id, ...docSnap.data() } as FeedbackNote);
+    });
+    return notes;
+  } catch (error) {
+    console.error('Failed to fetch feedback notes:', error);
+    return [];
+  }
+}
+
+export async function createFeedbackNote(note: FeedbackNote): Promise<void> {
+  try {
+    const docRef = doc(db, FEEDBACK_NOTES_COLLECTION, note.id);
+    await setDoc(docRef, note);
+  } catch (error) {
+    console.error('Failed to create feedback note:', error);
+    throw error;
+  }
+}
+
+export async function updateFeedbackNote(id: string, patch: Partial<FeedbackNote>): Promise<void> {
+  try {
+    const docRef = doc(db, FEEDBACK_NOTES_COLLECTION, id);
+    await updateDoc(docRef, patch);
+  } catch (error) {
+    console.error('Failed to update feedback note:', error);
+    throw error;
+  }
+}
+
+export async function deleteFeedbackNote(id: string): Promise<void> {
+  try {
+    const docRef = doc(db, FEEDBACK_NOTES_COLLECTION, id);
+    await deleteDoc(docRef);
+  } catch (error) {
+    console.error('Failed to delete feedback note:', error);
     throw error;
   }
 }

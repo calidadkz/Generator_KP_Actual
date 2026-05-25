@@ -13,6 +13,8 @@ import {
   fetchStyleDNA,
   fetchCleaningConfig,
   fetchFewShotExamples,
+  fetchClientPortraits,
+  fetchFeedbackNotes,
   DialogueWithTexts,
 } from '../lib/dialogueCloud';
 import { DialogueRecord } from '../types';
@@ -27,6 +29,7 @@ export function useCloudSync() {
     dialogues, setDialogues, updateDialogue, deleteDialogue, setBatchInsights,
     _loadScriptNodes, _loadMicroPresentations, _loadMachineTypes,
     _loadArticles, _loadFewShotExamples, _loadCleaningConfig,
+    _loadClientPortraits, _loadFeedbackNotes,
     setStyleDNA,
   } = useSalesStore();
   const [isSyncing, setIsSyncing] = useState(false);
@@ -148,6 +151,8 @@ export function useCloudSync() {
         styleDNA,
         cleaningConfig,
         fewShotExamples,
+        clientPortraits,
+        feedbackNotes,
       ] = await Promise.all([
         syncFromCloud(),
         fetchBatchInsights(),
@@ -158,6 +163,8 @@ export function useCloudSync() {
         fetchStyleDNA(),
         fetchCleaningConfig(),
         fetchFewShotExamples(),
+        fetchClientPortraits(),
+        fetchFeedbackNotes(),
       ]);
 
       // Merge dialogues: cloud version takes precedence
@@ -239,6 +246,16 @@ export function useCloudSync() {
       if (fewShotExamples.length > 0) {
         _loadFewShotExamples(fewShotExamples);
         console.log(`Synced ${fewShotExamples.length} few shot examples from Firestore`);
+      }
+
+      if (clientPortraits.length > 0) {
+        _loadClientPortraits(clientPortraits);
+        console.log(`Synced ${clientPortraits.length} client portraits from Firestore`);
+      }
+
+      if (feedbackNotes.length > 0) {
+        _loadFeedbackNotes(feedbackNotes);
+        console.log(`Synced ${feedbackNotes.length} feedback notes from Firestore`);
       }
 
       console.log('[Cloud Sync] ✓ All data synced from Firestore');

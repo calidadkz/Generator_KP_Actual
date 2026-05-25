@@ -10,9 +10,19 @@ import {
   StyleDNA,
   FewShotExample,
   CleaningConfig,
+  ClientPortrait,
+  FeedbackNote,
 } from '../types';
 import { deleteDialogueTexts, saveDialogueTexts } from '../lib/dialogueStorage';
 import { cloudSyncManager } from '../lib/cloudSyncManager';
+import {
+  saveClientPortrait,
+  updateClientPortrait as updatePortraitInCloud,
+  deleteClientPortrait as deletePortraitFromCloud,
+  createFeedbackNote,
+  updateFeedbackNote as updateNoteInCloud,
+  deleteFeedbackNote as deleteNoteFromCloud,
+} from '../lib/dialogueCloud';
 
 const defaultCleaningConfig: CleaningConfig = {
   geminiPrompt: `Это расшифровка телефонного разговора. Исправь ТОЛЬКО явные ошибки распознавания речи:
@@ -214,6 +224,10 @@ interface SalesStore {
   styleDNA: StyleDNA | null;
   fewShotExamples: FewShotExample[];
   cleaningConfig: CleaningConfig;
+  // Модуль 06/15: Портреты клиентов
+  clientPortraits: ClientPortrait[];
+  // Модуль 08: Шестерёнка
+  feedbackNotes: FeedbackNote[];
 
   addMachineType: (t: MachineType) => void;
   updateMachineType: (id: string, patch: Partial<MachineType>) => void;
@@ -256,6 +270,18 @@ interface SalesStore {
   _loadArticles: (articles: Article[]) => void;
   _loadFewShotExamples: (examples: FewShotExample[]) => void;
   _loadCleaningConfig: (config: CleaningConfig) => void;
+  _loadClientPortraits: (portraits: ClientPortrait[]) => void;
+  _loadFeedbackNotes: (notes: FeedbackNote[]) => void;
+
+  // Модуль 15: Портреты клиентов
+  addClientPortrait: (p: ClientPortrait) => void;
+  updateClientPortrait: (id: string, patch: Partial<ClientPortrait>) => void;
+  deleteClientPortrait: (id: string) => void;
+
+  // Модуль 08: Шестерёнка
+  addFeedbackNote: (note: FeedbackNote) => void;
+  updateFeedbackNote: (id: string, patch: Partial<FeedbackNote>) => void;
+  deleteFeedbackNote: (id: string) => void;
 
   migrateOldDialogues: () => Promise<void>;
 }
@@ -272,6 +298,8 @@ export const useSalesStore = create<SalesStore>()(
       styleDNA: null,
       fewShotExamples: [],
       cleaningConfig: defaultCleaningConfig,
+      clientPortraits: [],
+      feedbackNotes: [],
 
       addMachineType: (t) =>
         set((s) => {
@@ -424,6 +452,38 @@ export const useSalesStore = create<SalesStore>()(
       _loadArticles: (articles) => set({ articles }),
       _loadFewShotExamples: (examples) => set({ fewShotExamples: examples }),
       _loadCleaningConfig: (config) => set({ cleaningConfig: config }),
+      _loadClientPortraits: (portraits) => set({ clientPortraits: portraits }),
+      _loadFeedbackNotes: (notes) => set({ feedbackNotes: notes }),
+
+      addClientPortrait: (p) => {
+        set((s) => ({ clientPortraits: [...s.clientPortraits, p] }));
+        saveClientPortrait(p).catch(console.error);
+      },
+      updateClientPortrait: (id, patch) => {
+        set((s) => ({
+          clientPortraits: s.clientPortraits.map((p) => (p.id === id ? { ...p, ...patch } : p)),
+        }));
+        updatePortraitInCloud(id, patch).catch(console.error);
+      },
+      deleteClientPortrait: (id) => {
+        set((s) => ({ clientPortraits: s.clientPortraits.filter((p) => p.id !== id) }));
+        deletePortraitFromCloud(id).catch(console.error);
+      },
+
+      addFeedbackNote: (note) => {
+        set((s) => ({ feedbackNotes: [note, ...s.feedbackNotes] }));
+        createFeedbackNote(note).catch(console.error);
+      },
+      updateFeedbackNote: (id, patch) => {
+        set((s) => ({
+          feedbackNotes: s.feedbackNotes.map((n) => (n.id === id ? { ...n, ...patch } : n)),
+        }));
+        updateNoteInCloud(id, patch).catch(console.error);
+      },
+      deleteFeedbackNote: (id) => {
+        set((s) => ({ feedbackNotes: s.feedbackNotes.filter((n) => n.id !== id) }));
+        deleteNoteFromCloud(id).catch(console.error);
+      },
 
       migrateOldDialogues: async () => {
         const dialogues = get().dialogues;

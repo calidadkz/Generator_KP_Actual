@@ -1,21 +1,24 @@
 import React, { useState } from 'react';
-import { ArrowLeft, MessageSquare, BookOpen, Presentation, Cpu, Library, FileText } from 'lucide-react';
+import { ArrowLeft, MessageSquare, BookOpen, Presentation, Cpu, Library, FileText, Settings } from 'lucide-react';
 import { AdminDialogues } from './AdminDialogues';
 import { AdminScript } from './AdminScript';
 import { AdminMicroPresentations } from './AdminMicroPresentations';
 import { AdminMachineTypes } from './AdminMachineTypes';
 import { HolisticLibraryView } from './HolisticLibraryView';
 import { AdminArticles } from './AdminArticles';
+import { AdminFeedback } from './AdminFeedback';
+import { useSalesStore } from '../../store/useSalesStore';
 
-type AdminTab = 'dialogues' | 'script' | 'micropresentations' | 'machinetypes' | 'library' | 'articles';
+type AdminTab = 'dialogues' | 'script' | 'micropresentations' | 'machinetypes' | 'library' | 'articles' | 'feedback';
 
 const TABS: { id: AdminTab; label: string; icon: React.ElementType }[] = [
   { id: 'dialogues',          label: 'Диалоги',          icon: MessageSquare },
   { id: 'script',             label: 'Скрипт',            icon: BookOpen },
-  { id: 'micropresentations', label: 'Мини-презентации',  icon: Presentation },
+  { id: 'micropresentations', label: 'МП / Атомы',        icon: Presentation },
   { id: 'machinetypes',       label: 'Типы станков',      icon: Cpu },
   { id: 'library',            label: 'Библиотека',        icon: Library },
   { id: 'articles',           label: 'Статьи',            icon: FileText },
+  { id: 'feedback',           label: 'Обратная связь',    icon: Settings },
 ];
 
 interface AdminPanelProps {
@@ -24,6 +27,8 @@ interface AdminPanelProps {
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
   const [activeTab, setActiveTab] = useState<AdminTab>('dialogues');
+  const { feedbackNotes } = useSalesStore();
+  const newNotesCount = feedbackNotes.filter((n) => n.status === 'new').length;
 
   const renderContent = () => {
     switch (activeTab) {
@@ -33,6 +38,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
       case 'machinetypes':       return <AdminMachineTypes />;
       case 'library':            return <HolisticLibraryView />;
       case 'articles':           return <AdminArticles />;
+      case 'feedback':           return <AdminFeedback />;
     }
   };
 
@@ -62,7 +68,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-2 px-4 py-3 text-xs font-bold border-b-2 transition-colors ${
+            className={`relative flex items-center gap-2 px-4 py-3 text-xs font-bold border-b-2 transition-colors ${
               activeTab === tab.id
                 ? 'border-calidad-blue text-calidad-blue'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -70,6 +76,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
           >
             <tab.icon size={14} />
             {tab.label}
+            {tab.id === 'feedback' && newNotesCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-amber-500 text-white text-[9px] font-black rounded-full flex items-center justify-center">
+                {newNotesCount > 9 ? '9+' : newNotesCount}
+              </span>
+            )}
           </button>
         ))}
       </div>
