@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeft, MessageSquare, BookOpen, Presentation, Cpu, Library, FileText, Settings } from 'lucide-react';
+import { ArrowLeft, MessageSquare, BookOpen, Presentation, Cpu, Library, FileText, Settings, Sparkles } from 'lucide-react';
 import { AdminDialogues } from './AdminDialogues';
 import { AdminScript } from './AdminScript';
 import { AdminMicroPresentations } from './AdminMicroPresentations';
@@ -7,9 +7,10 @@ import { AdminMachineTypes } from './AdminMachineTypes';
 import { HolisticLibraryView } from './HolisticLibraryView';
 import { AdminArticles } from './AdminArticles';
 import { AdminFeedback } from './AdminFeedback';
+import { AgentPanel } from './AgentPanel';
 import { useSalesStore } from '../../store/useSalesStore';
 
-type AdminTab = 'dialogues' | 'script' | 'micropresentations' | 'machinetypes' | 'library' | 'articles' | 'feedback';
+type AdminTab = 'dialogues' | 'script' | 'micropresentations' | 'machinetypes' | 'library' | 'articles' | 'feedback' | 'agent';
 
 const TABS: { id: AdminTab; label: string; icon: React.ElementType }[] = [
   { id: 'dialogues',          label: 'Диалоги',          icon: MessageSquare },
@@ -19,6 +20,7 @@ const TABS: { id: AdminTab; label: string; icon: React.ElementType }[] = [
   { id: 'library',            label: 'Библиотека',        icon: Library },
   { id: 'articles',           label: 'Статьи',            icon: FileText },
   { id: 'feedback',           label: 'Обратная связь',    icon: Settings },
+  { id: 'agent',              label: 'Агент',             icon: Sparkles },
 ];
 
 interface AdminPanelProps {
@@ -39,6 +41,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
       case 'library':            return <HolisticLibraryView />;
       case 'articles':           return <AdminArticles />;
       case 'feedback':           return <AdminFeedback />;
+      case 'agent':              return <AgentPanel />;
     }
   };
 
@@ -86,8 +89,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-6">
-        <div className="max-w-3xl mx-auto">
+      <div className={`flex-1 min-h-0 p-6 ${activeTab === 'agent' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto'}`}>
+        <div className={activeTab === 'agent' ? 'flex flex-col flex-1 min-h-0 max-w-3xl mx-auto w-full' : 'max-w-3xl mx-auto'}>
           {renderContent()}
         </div>
       </div>
