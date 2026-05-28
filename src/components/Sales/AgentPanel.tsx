@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Loader2, CheckCircle, XCircle, AlertTriangle, Sparkles } from 'lucide-react';
+import { Send, Bot, User, Loader2, CheckCircle, XCircle, AlertTriangle, Sparkles, Trash2 } from 'lucide-react';
 import { useSalesStore } from '../../store/useSalesStore';
 import { MicroPresentation, ScriptNode } from '../../types';
 import { logApiUsage } from '../../lib/apiUsageLog';
@@ -29,6 +29,36 @@ type DisplayMsg =
   | { id: string; type: 'tool_proposal'; toolCall: ToolCall; status: 'pending' | 'confirmed' | 'rejected' }
   | { id: string; type: 'tool_auto'; toolName: string; summary: string }
   | { id: string; type: 'error'; text: string };
+
+// ─── Chat history persistence ────────────────────────────────────────────────
+
+const CHAT_STORAGE_KEY = 'calidad_agent_chat_v1';
+const MAX_DISPLAY = 100;
+const MAX_API = 40;
+
+function loadChatHistory(): { displayMsgs: DisplayMsg[]; apiHistory: ApiMessage[] } {
+  try {
+    const raw = localStorage.getItem(CHAT_STORAGE_KEY);
+    if (!raw) return { displayMsgs: [], apiHistory: [] };
+    const parsed = JSON.parse(raw);
+    return {
+      displayMsgs: Array.isArray(parsed.displayMsgs) ? parsed.displayMsgs : [],
+      apiHistory: Array.isArray(parsed.apiHistory) ? parsed.apiHistory : [],
+    };
+  } catch {
+    return { displayMsgs: [], apiHistory: [] };
+  }
+}
+
+function saveChatHistory(displayMsgs: DisplayMsg[], apiHistory: ApiMessage[]) {
+  try {
+    localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify({
+      displayMsgs: displayMsgs.slice(-MAX_DISPLAY),
+      apiHistory: apiHistory.slice(-MAX_API),
+      savedAt: new Date().toISOString(),
+    }));
+  } catch { /* quota exceeded — ignore */ }
+}
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -100,8 +130,9 @@ export const AgentPanel: React.FC = () => {
     updateDialogue,
   } = useSalesStore();
 
-  const [displayMsgs, setDisplayMsgs] = useState<DisplayMsg[]>([]);
-  const [apiHistory, setApiHistory] = useState<ApiMessage[]>([]);
+  const saved = loadChatHistory();
+  const [displayMsgs, setDisplayMsgs] = useState<DisplayMsg[]>(saved.displayMsgs);
+  const [apiHistory, setApiHistory] = useState<ApiMessage[]>(saved.apiHistory);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [pendingToolMsgId, setPendingToolMsgId] = useState<string | null>(null);
@@ -112,6 +143,10 @@ export const AgentPanel: React.FC = () => {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [displayMsgs]);
+
+  useEffect(() => {
+    if (displayMsgs.length > 0) saveChatHistory(displayMsgs, apiHistory);
+  }, [displayMsgs, apiHistory]);
 
   const stats = {
     mpCount: microPresentations.length,
@@ -590,12 +625,25 @@ export const AgentPanel: React.FC = () => {
         <div className="w-9 h-9 rounded-xl bg-indigo-100 flex items-center justify-center flex-shrink-0">
           <Sparkles size={18} className="text-indigo-600" />
         </div>
-        <div>
+        <div className="flex-1 min-w-0">
           <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider">Knowledge Architect</h3>
           <p className="text-xs text-gray-400 mt-0.5">
             {stats.mpCount} атомов · {stats.scriptCount} этапов · {stats.dialogueCount} диалогов
           </p>
         </div>
+        {displayMsgs.length > 0 && (
+          <button
+            onClick={() => {
+              setDisplayMsgs([]);
+              setApiHistory([]);
+              localStorage.removeItem(CHAT_STORAGE_KEY);
+            }}
+            title="Очистить историю чата"
+            className="p-1.5 text-gray-300 hover:text-red-400 transition-colors rounded-lg hover:bg-red-50"
+          >
+            <Trash2 size={14} />
+          </button>
+        )}
       </div>
 
       {/* Messages */}
