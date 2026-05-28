@@ -165,6 +165,48 @@ const AGENT_TOOLS = [
       required: ['id', 'qualifiers'],
     },
   },
+  {
+    name: 'update_script_node',
+    description: 'Обновить существующий этап скрипта. ID берёшь из get_script_nodes.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'ID этапа из get_script_nodes' },
+        title: { type: 'string', description: 'Новое название' },
+        content: { type: 'string', description: 'Новое содержание — что говорить на этапе' },
+        category: { type: 'string', enum: SCRIPT_CATEGORIES, description: 'Категория этапа' },
+        tips: { type: 'string', description: 'Советы через | (перезапишет список). Передай "" чтобы очистить.' },
+      },
+      required: ['id'],
+    },
+  },
+  {
+    name: 'delete_micro_presentation',
+    description: 'УДАЛИТЬ атом знаний. Только для дублей — проверь get_micro_presentations перед удалением.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'ID атома (mp-xxx) из get_micro_presentations' },
+        reason: { type: 'string', description: 'Причина удаления: что это дублирует' },
+      },
+      required: ['id', 'reason'],
+    },
+  },
+  {
+    name: 'analyze_dialogue',
+    description: 'Запустить AI-анализ диалога. Используй для диалогов с analysisStatus=pending или analysisStatus=error. Занимает 15-30 секунд.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'ID диалога из get_dialogues' },
+        forArticles: {
+          type: 'boolean',
+          description: 'true = также извлечь темы для статей (articleTopics, painPoints). Используй для реальных звонков с богатым содержанием.',
+        },
+      },
+      required: ['id'],
+    },
+  },
 ];
 
 // ─── Системный промпт ─────────────────────────────────────────────────────────
@@ -198,6 +240,19 @@ const SYSTEM_PROMPT_BASE = `Ты — Knowledge Architect системы CALIDAD.
 ЗАПОЛНЕНИЕ КВАЛИФИКАЦИОННЫХ СЛОТОВ:
 1. get_machine_types → посмотри текущие слоты
 2. update_machine_type(id, qualifiers) → формат key:label через |
+
+УПРАВЛЕНИЕ СКРИПТОМ:
+- update_script_node(id) — обновить этап: title, content, category, tips (через |)
+- create_script_node — создать новый этап
+
+УДАЛЕНИЕ ДУБЛЕЙ:
+- delete_micro_presentation(id, reason) — только для явных дублей
+- Перед удалением всегда проверь get_micro_presentations
+
+АНАЛИЗ ДИАЛОГОВ:
+- analyze_dialogue(id) — запустить AI-анализ pending/error диалогов
+- forArticles=true — дополнительно извлечь темы для статей
+- После анализа используй get_dialogue_content для чтения результатов
 
 ПРАВИЛА ПОВЕДЕНИЯ:
 1. Перед созданием МП — проверяй дубли через get_micro_presentations

@@ -3,6 +3,8 @@ import { Send, Bot, User, Loader2, CheckCircle, XCircle, AlertTriangle, Sparkles
 import { useSalesStore } from '../../store/useSalesStore';
 import { MicroPresentation, ScriptNode } from '../../types';
 import { logApiUsage } from '../../lib/apiUsageLog';
+import { analyzeDialogue, extractArticlePatterns } from '../../services/dialogueProcessor';
+import { resolveDialogueTexts } from '../../lib/dialogueStorage';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -33,27 +35,33 @@ type DisplayMsg =
 const READ_TOOLS = new Set(['get_micro_presentations', 'get_script_nodes', 'get_dialogues', 'get_dialogue_content', 'get_machine_types']);
 
 const TOOL_LABELS: Record<string, string> = {
-  create_micro_presentation: 'Создать атом знаний',
-  update_micro_presentation: 'Обновить атом знаний',
-  get_micro_presentations: 'Поиск атомов знаний',
-  get_script_nodes: 'Загрузка скрипта',
-  get_dialogues: 'Загрузка диалогов',
-  get_dialogue_content: 'Чтение диалога',
-  get_machine_types: 'Типы станков',
-  create_script_node: 'Создать этап скрипта',
-  update_machine_type: 'Обновить слоты станка',
+  create_micro_presentation:  'Создать атом знаний',
+  update_micro_presentation:  'Обновить атом знаний',
+  delete_micro_presentation:  'Удалить атом знаний',
+  get_micro_presentations:    'Поиск атомов знаний',
+  get_script_nodes:           'Загрузка скрипта',
+  get_dialogues:              'Загрузка диалогов',
+  get_dialogue_content:       'Чтение диалога',
+  get_machine_types:          'Типы станков',
+  create_script_node:         'Создать этап скрипта',
+  update_script_node:         'Обновить этап скрипта',
+  update_machine_type:        'Обновить слоты станка',
+  analyze_dialogue:           'Запустить анализ диалога',
 };
 
 const TOOL_RISK: Record<string, 'green' | 'yellow' | 'red'> = {
-  get_micro_presentations: 'green',
-  get_script_nodes: 'green',
-  get_dialogues: 'green',
-  get_dialogue_content: 'green',
-  get_machine_types: 'green',
-  create_micro_presentation: 'yellow',
-  update_micro_presentation: 'yellow',
-  create_script_node: 'yellow',
-  update_machine_type: 'yellow',
+  get_micro_presentations:    'green',
+  get_script_nodes:           'green',
+  get_dialogues:              'green',
+  get_dialogue_content:       'green',
+  get_machine_types:          'green',
+  create_micro_presentation:  'yellow',
+  update_micro_presentation:  'yellow',
+  create_script_node:         'yellow',
+  update_script_node:         'yellow',
+  analyze_dialogue:           'yellow',
+  update_machine_type:        'yellow',
+  delete_micro_presentation:  'red',
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -87,8 +95,9 @@ function uid(): string {
 export const AgentPanel: React.FC = () => {
   const {
     microPresentations, scriptNodes, dialogues, machineTypes,
-    addMicroPresentation, updateMicroPresentation,
-    addScriptNode, updateMachineType,
+    addMicroPresentation, updateMicroPresentation, deleteMicroPresentation,
+    addScriptNode, updateScriptNode, updateMachineType,
+    updateDialogue,
   } = useSalesStore();
 
   const [displayMsgs, setDisplayMsgs] = useState<DisplayMsg[]>([]);
@@ -114,7 +123,7 @@ export const AgentPanel: React.FC = () => {
 
   // ─── Tool execution ────────────────────────────────────────────────────────
 
-  function executeTool(name: string, input: Record<string, unknown>): string {
+  async function executeTool(name: string, input: Record<string, unknown>): Promise<string> {
     switch (name) {
       case 'get_micro_presentations': {
         let mps = microPresentations;
@@ -284,6 +293,84 @@ export const AgentPanel: React.FC = () => {
         return JSON.stringify({ success: true, message: `Станок "${mt.name}" обновлён: ${qualifiers.length} слотов` });
       }
 
+      case 'update_script_node': {
+        const id = String(input.id || '');
+        const updates: Partial<ScriptNode> = {};
+        if (input.title !== undefined) updates.title = String(input.title);
+        if (input.content !== undefined) updates.content = String(input.content);
+        if (input.category !== undefined) updates.category = String(input.category) as ScriptNode['category'];
+        if (input.tips !== undefined) {
+          const raw = String(input.tips).trim();
+          updates.tips = raw ? raw.split('|').map((s) => s.trim()).filter(Boolean) : [];
+        }
+        updateScriptNode(id, updates);
+        return JSON.stringify({ success: true, message: `Этап ${id} обновлён` });
+      }
+
+      case 'delete_micro_presentation': {
+        const id = String(input.id || '');
+        const mp = microPresentations.find((m) => m.id === id);
+        if (!mp) return JSON.stringify({ error: `МП ${id} не найдена` });
+        deleteMicroPresentation(id);
+        return JSON.stringify({ success: true, message: `МП "${mp.title}" (${id}) удалена. Причина: ${input.reason || 'не указана'}` });
+      }
+
+      case 'analyze_dialogue': {
+        const id = String(input.id || '');
+        const dialogue = dialogues.find((d) => d.id === id);
+        if (!dialogue) return JSON.stringify({ error: `Диалог ${id} не найден` });
+        if (!dialogue.textRef) return JSON.stringify({ error: `Диалог ${id} не имеет текста` });
+        if (dialogue.analysisStatus === 'analyzing') return JSON.stringify({ error: 'Анализ уже запущен' });
+
+        updateDialogue(id, { analysisStatus: 'analyzing', errorMessage: undefined, modelLog: [], usedModel: undefined });
+        try {
+          const texts = await resolveDialogueTexts(dialogue.textRef);
+          if (!texts) throw new Error('Текст не найден в хранилище');
+
+          const result = await analyzeDialogue(
+            texts.cleanedText || texts.rawText,
+            (entry) => {
+              const cur = useSalesStore.getState().dialogues.find((x) => x.id === id)?.modelLog ?? [];
+              updateDialogue(id, { modelLog: [...cur, entry] });
+            },
+          );
+
+          let finalData = result.data;
+          if (input.forArticles) {
+            try {
+              const patterns = await extractArticlePatterns(texts.cleanedText || texts.rawText);
+              finalData = { ...result.data, articleTopics: patterns.articleTopics, painPoints: patterns.painPoints, styleMarkers: patterns.styleMarkers };
+            } catch { /* ignore */ }
+          }
+
+          updateDialogue(id, {
+            analysisStatus: 'done',
+            extractedData: finalData,
+            clientType: finalData.clientType,
+            machineTypeHint: finalData.machineTypeHint,
+            usedModel: result.usedModel,
+            modelLog: result.log,
+          });
+
+          logApiUsage({
+            model: result.usedModel || 'gemini-2.5-flash',
+            module: 'dialogue_analyze',
+            inputTokens: Math.round((texts.cleanedText || texts.rawText).length / 4),
+            outputTokens: 500,
+          }).catch(() => {});
+
+          return JSON.stringify({
+            success: true,
+            message: `Анализ завершён. ${finalData.formulations?.length ?? 0} формулировок, ${finalData.suggestedMicroPresentations?.length ?? 0} предложенных МП, ${finalData.conversationSteps?.length ?? 0} этапов. Теперь вызови get_dialogue_content("${id}") чтобы прочитать результаты.`,
+            usedModel: result.usedModel,
+          });
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          updateDialogue(id, { analysisStatus: 'error', errorMessage: msg });
+          return JSON.stringify({ error: `Анализ не удался: ${msg}` });
+        }
+      }
+
       default:
         return JSON.stringify({ error: `Unknown tool: ${name}` });
     }
@@ -334,7 +421,7 @@ export const AgentPanel: React.FC = () => {
 
         if (READ_TOOLS.has(toolCall.name)) {
           // Auto-execute read tool
-          const result = executeTool(toolCall.name, toolCall.input);
+          const result = await executeTool(toolCall.name, toolCall.input);
           currentHistory = [
             ...currentHistory,
             { role: 'tool_result', toolName: toolCall.name, toolResult: result, toolCallId: toolCall.id },
@@ -412,7 +499,7 @@ export const AgentPanel: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const result = executeTool(toolCall.name, toolCall.input);
+      const result = await executeTool(toolCall.name, toolCall.input);
       const newHistory: ApiMessage[] = [
         ...apiHistory,
         { role: 'tool_result', toolName: toolCall.name, toolResult: result, toolCallId: toolCall.id },

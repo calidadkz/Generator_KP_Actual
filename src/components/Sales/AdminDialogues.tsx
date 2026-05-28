@@ -324,6 +324,12 @@ export const AdminDialogues: React.FC = () => {
   const [batchError, setBatchError] = useState<string | null>(null);
   const [extractArticlePatternsIds, setExtractArticlePatternsIds] = useState<Set<string>>(new Set());
 
+  // Mass analysis selection
+  const [selectedForAnalysis, setSelectedForAnalysis] = useState<Set<string>>(new Set());
+  const [massAnalysing, setMassAnalysing] = useState(false);
+  const [massProgress, setMassProgress] = useState({ done: 0, total: 0 });
+  const [massForArticles, setMassForArticles] = useState(false);
+
   // Dedup flash: keys that are "already exists"
   const [dupFlashKeys, setDupFlashKeys] = useState<Set<string>>(new Set());
 
@@ -525,6 +531,37 @@ export const AdminDialogues: React.FC = () => {
     } finally {
       setBatchProcessing(false);
     }
+  };
+
+  // ── Mass analysis ───────────────────────────────────────────────────────────
+
+  const pendingForAnalysis = dialogues.filter(
+    (d) => d.cleanStatus === 'ready' && (d.analysisStatus === 'pending' || d.analysisStatus === 'error'),
+  );
+
+  const handleMassAnalyze = async () => {
+    const toAnalyze = selectedForAnalysis.size > 0
+      ? pendingForAnalysis.filter((d) => selectedForAnalysis.has(d.id))
+      : pendingForAnalysis;
+    if (toAnalyze.length === 0) return;
+
+    setMassAnalysing(true);
+    setMassProgress({ done: 0, total: toAnalyze.length });
+
+    // Enable forArticles flag for selected dialogues if massForArticles is on
+    if (massForArticles) {
+      toAnalyze.forEach((d) => {
+        setExtractArticlePatternsIds((prev) => new Set([...prev, d.id]));
+      });
+    }
+
+    for (let i = 0; i < toAnalyze.length; i++) {
+      await handleAnalyze(toAnalyze[i]);
+      setMassProgress({ done: i + 1, total: toAnalyze.length });
+    }
+
+    setMassAnalysing(false);
+    setSelectedForAnalysis(new Set());
   };
 
   // ── Add to script/library with dedup ────────────────────────────────────────
@@ -770,6 +807,8 @@ export const AdminDialogues: React.FC = () => {
   const renderCard = (d: DialogueRecord) => {
     const isEditing = editingId === d.id;
 
+    const isPending = d.cleanStatus === 'ready' && (d.analysisStatus === 'pending' || d.analysisStatus === 'error');
+
     return (
       <div key={d.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         {/* Card header */}
@@ -777,6 +816,21 @@ export const AdminDialogues: React.FC = () => {
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
+                {isPending && pendingForAnalysis.length > 0 && (
+                  <input
+                    type="checkbox"
+                    checked={selectedForAnalysis.has(d.id)}
+                    onChange={(e) => {
+                      setSelectedForAnalysis((prev) => {
+                        const next = new Set(prev);
+                        if (e.target.checked) next.add(d.id); else next.delete(d.id);
+                        return next;
+                      });
+                    }}
+                    className="w-4 h-4 accent-calidad-blue flex-shrink-0"
+                    title="Выбрать для массового анализа"
+                  />
+                )}
                 <span className="text-sm font-semibold text-gray-800 truncate max-w-[200px]">
                   {d.filename}
                 </span>
@@ -1231,6 +1285,56 @@ export const AdminDialogues: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Mass analysis toolbar */}
+      {pendingForAnalysis.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex flex-wrap items-center gap-3">
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-bold text-amber-800">
+              {pendingForAnalysis.length} диалогов ожидают анализа
+              {selectedForAnalysis.size > 0 && ` · выбрано ${selectedForAnalysis.size}`}
+            </p>
+            {massAnalysing && (
+              <p className="text-xs text-amber-600 mt-0.5">
+                Обрабатывается {massProgress.done} / {massProgress.total}...
+              </p>
+            )}
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <label className="flex items-center gap-1.5 text-xs font-bold text-amber-700 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={massForArticles}
+                onChange={(e) => setMassForArticles(e.target.checked)}
+                className="w-3.5 h-3.5"
+              />
+              Для статей
+            </label>
+            <button
+              onClick={() => {
+                if (selectedForAnalysis.size === pendingForAnalysis.length) {
+                  setSelectedForAnalysis(new Set());
+                } else {
+                  setSelectedForAnalysis(new Set(pendingForAnalysis.map((d) => d.id)));
+                }
+              }}
+              className="px-2.5 py-1.5 text-xs font-bold bg-white border border-amber-300 text-amber-700 rounded-lg hover:bg-amber-50 transition-colors"
+            >
+              {selectedForAnalysis.size === pendingForAnalysis.length ? 'Снять все' : 'Выбрать все'}
+            </button>
+            <button
+              onClick={handleMassAnalyze}
+              disabled={massAnalysing}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-calidad-blue text-white rounded-lg hover:bg-blue-800 transition-colors disabled:opacity-50"
+            >
+              {massAnalysing
+                ? <><Loader size={11} className="animate-spin" /> {massProgress.done}/{massProgress.total}</>
+                : <><Sparkles size={11} /> {selectedForAnalysis.size > 0 ? `Анализировать ${selectedForAnalysis.size}` : `Анализировать все (${pendingForAnalysis.length})`}</>
+              }
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Info banner about classification */}
       <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs text-blue-700">
