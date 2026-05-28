@@ -338,6 +338,9 @@ export const AdminDialogues: React.FC = () => {
   const [editDraft, setEditDraft] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
 
+  // Expanded step content (for "Этапы разговора")
+  const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set());
+
   // Grouping view
   const [groupByMachine, setGroupByMachine] = useState(false);
 
@@ -1104,21 +1107,38 @@ export const AdminDialogues: React.FC = () => {
 
                     {(d.extractedData.conversationSteps?.length ?? 0) > 0 && (
                       <div className="px-4 py-3">
-                        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Этапы разговора</p>
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Этапы разговора</p>
+                          <span className="text-[10px] text-gray-400">→ можно добавить в шаблон скрипта</span>
+                        </div>
                         <div className="space-y-2">
                           {(d.extractedData.conversationSteps ?? []).map((step, i) => {
                             const pickerKey = `${d.id}-step-${i}`;
                             const isDone = addedStepKeys.has(pickerKey);
                             const isDup = dupFlashKeys.has(pickerKey);
                             const isOpen = stepPicker === pickerKey;
+                            const stepExpanded = expandedSteps.has(pickerKey);
                             return (
                               <div key={i} className="flex items-start gap-2 bg-gray-50 rounded-lg p-3">
                                 <div className="flex-1 min-w-0">
                                   <p className="text-xs font-bold text-gray-700">{step.title}</p>
-                                  <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{step.content}</p>
+                                  <p className={`text-xs text-gray-500 mt-0.5 ${stepExpanded ? '' : 'line-clamp-2'}`}>{step.content}</p>
+                                  {step.content && step.content.length > 120 && (
+                                    <button
+                                      onClick={() => setExpandedSteps((prev) => {
+                                        const n = new Set(prev);
+                                        stepExpanded ? n.delete(pickerKey) : n.add(pickerKey);
+                                        return n;
+                                      })}
+                                      className="text-[10px] text-calidad-blue mt-0.5 hover:underline"
+                                    >
+                                      {stepExpanded ? 'Свернуть' : 'Читать полностью'}
+                                    </button>
+                                  )}
                                 </div>
                                 <div className="relative flex-shrink-0" onMouseDown={(e) => e.stopPropagation()}>
                                   <button
+                                    title="Добавить этот шаг в шаблон скрипта продаж (вкладка Скрипт)"
                                     onMouseDown={() => !isDone && !isDup && setStepPicker(isOpen ? null : pickerKey)}
                                     className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold transition-all duration-200 ${
                                       isDup
@@ -1133,7 +1153,7 @@ export const AdminDialogues: React.FC = () => {
                                     ) : isDone ? (
                                       <><CheckCircle size={10} /> Добавлено</>
                                     ) : (
-                                      <><Plus size={10} /> В скрипт <ChevronDown size={9} className="ml-0.5" /></>
+                                      <><Plus size={10} /> В шаблон <ChevronDown size={9} className="ml-0.5" /></>
                                     )}
                                   </button>
 
