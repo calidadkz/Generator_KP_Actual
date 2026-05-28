@@ -374,9 +374,11 @@ export const ManagerCockpit: React.FC<ManagerCockpitProps> = ({ onBack }) => {
   const matchesMachineType = (mp: MicroPresentation) =>
     !activeTask?.machineTypeId || !mp.machineTypeIds?.length || mp.machineTypeIds.includes(activeTask.machineTypeId);
 
+  // МП показывается если ВСЕ указанные условия слотов выполнены
+  // (every = AND логика: материал=фанера И толщина>15мм → показать МП про фрезер)
   const matchesSlotConditions = (mp: MicroPresentation): boolean => {
     if (!mp.slotConditions || Object.keys(mp.slotConditions).length === 0) return false;
-    return Object.entries(mp.slotConditions).some(([slotKey, values]) => {
+    return Object.entries(mp.slotConditions).every(([slotKey, values]) => {
       const filled = activeSlots[slotKey]?.toLowerCase().trim();
       return !!filled && values.some(v => filled.includes(v.toLowerCase()));
     });

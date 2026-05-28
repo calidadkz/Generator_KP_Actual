@@ -91,7 +91,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
       {/* Content */}
       <div className={`flex-1 min-h-0 p-6 ${activeTab === 'agent' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto'}`}>
         <div className={activeTab === 'agent' ? 'flex flex-col flex-1 min-h-0 max-w-3xl mx-auto w-full' : 'max-w-3xl mx-auto'}>
-          {renderContent()}
+          {/* AgentPanel держим смонтированным — иначе история чата сбрасывается при смене вкладки */}
+          <div className={activeTab === 'agent' ? 'flex flex-col flex-1 min-h-0' : 'hidden'}>
+            <AgentPanel />
+          </div>
+          {activeTab !== 'agent' && renderContent()}
         </div>
       </div>
     </div>
