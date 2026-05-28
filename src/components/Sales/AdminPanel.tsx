@@ -92,13 +92,23 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
       </div>
 
       {/* Content */}
-      <div className={`flex-1 min-h-0 p-6 ${activeTab === 'agent' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto'}`}>
-        <div className={activeTab === 'agent' ? 'flex flex-col flex-1 min-h-0 max-w-3xl mx-auto w-full' : 'max-w-3xl mx-auto'}>
+      <div className={`flex-1 min-h-0 p-6 ${(activeTab === 'agent' || activeTab === 'library') ? 'flex flex-col overflow-hidden' : 'overflow-y-auto'}`}>
+        <div className={
+          activeTab === 'agent'
+            ? 'flex flex-col flex-1 min-h-0 max-w-3xl mx-auto w-full'
+            : activeTab === 'library'
+            ? 'flex flex-col flex-1 min-h-0 w-full'
+            : 'max-w-3xl mx-auto'
+        }>
           {/* AgentPanel держим смонтированным — иначе история чата сбрасывается при смене вкладки */}
           <div className={activeTab === 'agent' ? 'flex flex-col flex-1 min-h-0' : 'hidden'}>
             <AgentPanel />
           </div>
-          {activeTab !== 'agent' && renderContent()}
+          {/* Library держим смонтированным для сохранения выбранного атома */}
+          <div className={activeTab === 'library' ? 'flex flex-col flex-1 min-h-0' : 'hidden'}>
+            <HolisticLibraryView />
+          </div>
+          {activeTab !== 'agent' && activeTab !== 'library' && renderContent()}
         </div>
       </div>
     </div>

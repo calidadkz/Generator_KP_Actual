@@ -10,7 +10,9 @@ const UNIVERSAL_SLOTS: QualificationSlot[] = [
   { key: 'timeline',    label: 'Срок' },
 ];
 
-const CATEGORIES = ['Открытие', 'Квалификация', 'Возражения', 'Закрытие', 'Общее', 'Формулировки'];
+// Формулировки — зарезервированная тема: атомы показываются менеджеру всегда.
+// Остальные темы — свободные строки, задаёт пользователь/агент.
+const ALWAYS_SHOWN_CATEGORY = 'Формулировки';
 
 function newId() {
   return 'mp-' + Date.now().toString(36);
@@ -51,6 +53,13 @@ export const AdminMicroPresentations: React.FC = () => {
     return result;
   }, [machineTypes]);
 
+  // Динамический список тем: Формулировки всегда первая, остальные из существующих атомов
+  const allCategories = useMemo(() => {
+    const fromAtoms = Array.from(new Set(microPresentations.map((mp) => mp.category).filter(Boolean)));
+    const sorted = fromAtoms.filter((c) => c !== ALWAYS_SHOWN_CATEGORY).sort();
+    return [ALWAYS_SHOWN_CATEGORY, ...sorted];
+  }, [microPresentations]);
+
   const toggle = (id: string) => setExpanded((p) => ({ ...p, [id]: !p[id] }));
 
   const handleAdd = () => {
@@ -58,7 +67,7 @@ export const AdminMicroPresentations: React.FC = () => {
       id: newId(),
       title: 'Новый атом знаний',
       content: '',
-      category: 'Общее',
+      category: '',
       machineTypeIds: [],
       tags: [],
       isPublished: true,
@@ -120,8 +129,8 @@ export const AdminMicroPresentations: React.FC = () => {
           onChange={(e) => setFilterCategory(e.target.value)}
           className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-calidad-blue bg-white text-gray-600 font-semibold"
         >
-          <option value="">Все категории</option>
-          {CATEGORIES.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
+          <option value="">Все темы</option>
+          {allCategories.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
         </select>
         <select
           value={filterPublished}
@@ -143,7 +152,7 @@ export const AdminMicroPresentations: React.FC = () => {
       </div>
 
       {/* Grouped by category when no specific category filter active */}
-      {(filterCategory ? [filterCategory] : CATEGORIES).map((cat) => {
+      {(filterCategory ? [filterCategory] : allCategories).map((cat) => {
         const group = filtered.filter((mp) => mp.category === cat);
         if (group.length === 0) return null;
         return (
@@ -215,16 +224,22 @@ export const AdminMicroPresentations: React.FC = () => {
             <div className="px-4 pb-4 space-y-4 border-t border-gray-100">
               <div className="pt-3 flex items-center justify-between">
                 <div className="flex-1">
-                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Категория</label>
-                  <select
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">
+                    Тема атома
+                    {mp.category === ALWAYS_SHOWN_CATEGORY && (
+                      <span className="ml-2 normal-case font-normal text-yellow-600">— показывается менеджеру всегда</span>
+                    )}
+                  </label>
+                  <input
+                    list={`cats-${mp.id}`}
                     className="w-full text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-calidad-blue"
                     value={mp.category}
                     onChange={(e) => updateMicroPresentation(mp.id, { category: e.target.value })}
-                  >
-                    {CATEGORIES.map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
+                    placeholder="Например: Охлаждение, Цена, Материалы..."
+                  />
+                  <datalist id={`cats-${mp.id}`}>
+                    {allCategories.map((c) => <option key={c} value={c} />)}
+                  </datalist>
                 </div>
                 <div className="ml-4 flex items-center gap-2">
                   <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Опубликован</label>

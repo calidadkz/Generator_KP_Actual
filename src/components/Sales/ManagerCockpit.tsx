@@ -369,7 +369,10 @@ export const ManagerCockpit: React.FC<ManagerCockpitProps> = ({ onBack }) => {
   // Адаптивная фильтрация МП
   // ─────────────────────────────────────────────────────────────────────────
 
-  const ALWAYS_SHOWN_CATEGORIES = new Set(['Общее', 'Формулировки']);
+  // 'Формулировки' — показываются менеджеру ВСЕГДА независимо от этапа.
+  // 'Общее' убрано: атомы с такой темой показываются только если явно
+  // прилинкованы к этапу через microPresentationIds[].
+  const ALWAYS_SHOWN_CATEGORIES = new Set(['Формулировки']);
 
   const matchesMachineType = (mp: MicroPresentation) =>
     !activeTask?.machineTypeId || !mp.machineTypeIds?.length || mp.machineTypeIds.includes(activeTask.machineTypeId);
@@ -395,12 +398,9 @@ export const ManagerCockpit: React.FC<ManagerCockpitProps> = ({ onBack }) => {
       if (linked.length > 0) {
         regular = base.filter(mp => linked.includes(mp.id) && !matchesSlotConditions(mp));
       } else {
-        const idx = sorted.findIndex(n => n.id === step.id);
-        const nextStep = idx >= 0 ? sorted[idx + 1] : null;
-        const cats = new Set<string>(ALWAYS_SHOWN_CATEGORIES);
-        if (step.category) cats.add(step.category);
-        if (nextStep?.category) cats.add(nextStep.category);
-        regular = base.filter(mp => cats.has(mp.category) && !matchesSlotConditions(mp));
+        // Этап не имеет явно прилинкованных МП → показываем только всегда-видимые
+        // (Формулировки). Это стимул руководителю привязать атомы к этапу через агента.
+        regular = base.filter(mp => ALWAYS_SHOWN_CATEGORIES.has(mp.category) && !matchesSlotConditions(mp));
       }
     }
     return { regular, slotBased };
