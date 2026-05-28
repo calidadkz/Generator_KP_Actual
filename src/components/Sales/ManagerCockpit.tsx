@@ -1,11 +1,14 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
-  ArrowLeft, ChevronDown, ChevronUp, CheckCircle, Circle, Cpu,
+  ArrowLeft, ChevronDown, ChevronUp, CheckCircle, Circle, Plus,
   BookText, Settings, AlertTriangle, X, Send, Phone, RotateCcw,
-  Pause, Play, User,
+  Pause, Play, User, Trash2,
 } from 'lucide-react';
 import { useSalesStore } from '../../store/useSalesStore';
-import { MicroPresentation, ScriptNode, FeedbackNote, QualificationSlot, QualificationSession } from '../../types';
+import {
+  MicroPresentation, ScriptNode, FeedbackNote,
+  QualificationSlot, QualificationTask, QualificationSession,
+} from '../../types';
 import {
   createQualSession, updateQualSession, fetchQualSessions, deleteQualSession,
 } from '../../lib/dialogueCloud';
@@ -14,7 +17,7 @@ import {
 
 const MANAGER_NAME_KEY = 'calidad_manager_name';
 
-// Универсальные слоты — показываются для ВСЕХ типов станков в начале квалификации
+// Универсальные слоты — общие для любого звонка, не зависят от типа станка
 const UNIVERSAL_SLOTS: QualificationSlot[] = [
   { key: 'client_name', label: 'Имя / Компания' },
   { key: 'budget',      label: 'Бюджет' },
@@ -42,6 +45,45 @@ function normalizeQualifiers(raw: unknown): QualificationSlot[] {
   });
 }
 
+// ─── Миграция старой структуры сессии (до задачного подхода) ─────────────────
+
+function migrateSession(s: QualificationSession): QualificationSession {
+  const raw = s as unknown as Record<string, unknown>;
+  if (!raw.tasks) {
+    const legacyMtIds = (raw.machineTypeIds as string[]) ?? [];
+    const legacySlots = (raw.slots as Record<string, string>) ?? {};
+    const legacyPendingSlots = (raw.pendingSlots as string[]) ?? [];
+    const legacyCompletedStepIds = (raw.completedStepIds as string[]) ?? [];
+
+    const universalKeys = new Set(['client_name', 'budget', 'timeline']);
+    const uSlots: Record<string, string> = {};
+    const taskSlots: Record<string, string> = {};
+    for (const [k, v] of Object.entries(legacySlots)) {
+      if (universalKeys.has(k)) uSlots[k] = v;
+      else taskSlots[k] = v;
+    }
+
+    const tasks: QualificationTask[] = legacyMtIds.map((mtId, i) => ({
+      id: 'task-migrated-' + i,
+      label: `Задача ${i + 1}`,
+      machineTypeId: mtId,
+      slots: i === 0 ? taskSlots : {},
+      pendingSlots: i === 0 ? legacyPendingSlots.filter(k => !universalKeys.has(k)) : [],
+      completedStepIds: legacyCompletedStepIds,
+    }));
+
+    return {
+      ...s,
+      tasks,
+      activeTaskId: tasks[0]?.id ?? null,
+      universalSlots: uSlots,
+      universalPendingSlots: legacyPendingSlots.filter(k => universalKeys.has(k)),
+      currentStepId: (raw.currentStepId as string | null) ?? null,
+    };
+  }
+  return s;
+}
+
 // ─── Типы ────────────────────────────────────────────────────────────────────
 
 interface ManagerCockpitProps {
@@ -63,22 +105,18 @@ export const ManagerCockpit: React.FC<ManagerCockpitProps> = ({ onBack }) => {
   const [savedSessions, setSavedSessions] = useState<QualificationSession[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const latestStateRef = useRef<Omit<QualificationSession, 'id' | 'managerName' | 'createdAt'>>({
-    machineTypeIds: [], focusMachineTypeId: null, status: 'active',
-    slots: {}, pendingSlots: [], currentStepId: null,
-    completedStepIds: [], completedMachineTypeIds: [], updatedAt: '',
-  });
+  const latestStateRef = useRef<Partial<QualificationSession>>({});
 
-  // ── Состояние звонка ──
-  const [clientMachineTypeIds, setClientMachineTypeIds] = useState<string[]>([]);
-  const [focusMachineTypeId, setFocusMachineTypeId] = useState<string | null>(null);
-  const [completedMachineTypeIds, setCompletedMachineTypeIds] = useState<string[]>([]);
+  // ── Задачи и слоты ──
+  const [tasks, setTasks] = useState<QualificationTask[]>([]);
+  const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+  const [uSlots, setUSlots] = useState<Record<string, string>>({});   // универсальные
+  const [uPending, setUPending] = useState<Set<string>>(new Set());
+
+  // ── Скрипт ──
   const [currentStepId, setCurrentStepId] = useState<string | null>(null);
-  const [completedStepIds, setCompletedStepIds] = useState<Set<string>>(new Set());
   const [expandedStepIds, setExpandedStepIds] = useState<Set<string>>(new Set());
   const [expandedMpIds, setExpandedMpIds] = useState<Set<string>>(new Set());
-  const [slots, setSlots] = useState<Record<string, string>>({});
-  const [pendingSlots, setPendingSlots] = useState<Set<string>>(new Set());
 
   // ── Шестерёнка ──
   const [gearOpen, setGearOpen] = useState(false);
@@ -86,43 +124,63 @@ export const ManagerCockpit: React.FC<ManagerCockpitProps> = ({ onBack }) => {
   const [gearUrgent, setGearUrgent] = useState(false);
   const [gearSent, setGearSent] = useState(false);
 
-  // ── Текущий тип станка и его слоты ──
-  const focusMachineType = machineTypes.find((m) => m.id === focusMachineTypeId) ?? null;
-  const machineSpecificSlots = normalizeQualifiers(focusMachineType?.qualifiers);
-  const allSlots = [...UNIVERSAL_SLOTS, ...machineSpecificSlots];
+  // ── Вычисляемые ──
+  const activeTask = useMemo(() => tasks.find(t => t.id === activeTaskId) ?? null, [tasks, activeTaskId]);
+  const activeMachineType = useMemo(
+    () => activeTask?.machineTypeId ? machineTypes.find(m => m.id === activeTask.machineTypeId) ?? null : null,
+    [activeTask?.machineTypeId, machineTypes],
+  );
+  const machineSpecificSlots = useMemo(() => normalizeQualifiers(activeMachineType?.qualifiers), [activeMachineType]);
+
+  // Объединённые слоты для сопоставления условий МП
+  const activeSlots = useMemo(
+    () => ({ ...uSlots, ...(activeTask?.slots ?? {}) }),
+    [uSlots, activeTask?.slots],
+  );
+
+  const activeCompletedStepIds = useMemo(
+    () => new Set(activeTask?.completedStepIds ?? []),
+    [activeTask?.completedStepIds],
+  );
+
+  // Этапы скрипта, отфильтрованные по типу станка активной задачи
+  const sorted = useMemo(() => {
+    const mtId = activeTask?.machineTypeId ?? null;
+    return [...scriptNodes]
+      .filter(n => !mtId || !n.machineTypeIds?.length || n.machineTypeIds.includes(mtId))
+      .filter(n => !n.scriptType || n.scriptType === 'qualification')
+      .sort((a, b) => a.order - b.order);
+  }, [scriptNodes, activeTask?.machineTypeId]);
+
+  const total = sorted.length;
+  const done = sorted.filter(n => activeCompletedStepIds.has(n.id)).length;
+  const progressPct = total > 0 ? Math.round((done / total) * 100) : 0;
+  const currentStep = sorted.find(n => n.id === currentStepId) ?? null;
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Загрузка сохранённых сессий при монтировании
+  // Загрузка сохранённых сессий
   // ─────────────────────────────────────────────────────────────────────────
 
   useEffect(() => {
     const name = localStorage.getItem(MANAGER_NAME_KEY);
     if (!name) return;
     setLoadingSessions(true);
-    fetchQualSessions(name)
-      .then(setSavedSessions)
-      .finally(() => setLoadingSessions(false));
+    fetchQualSessions(name).then(setSavedSessions).finally(() => setLoadingSessions(false));
   }, []);
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Синхронизация latestStateRef с текущим состоянием (для авто-сохранения)
+  // Авто-сохранение (debounce 800мс)
   // ─────────────────────────────────────────────────────────────────────────
 
   latestStateRef.current = {
-    machineTypeIds: clientMachineTypeIds,
-    focusMachineTypeId,
     status: 'active',
-    slots,
-    pendingSlots: [...pendingSlots],
+    universalSlots: uSlots,
+    universalPendingSlots: [...uPending],
+    tasks,
+    activeTaskId,
     currentStepId,
-    completedStepIds: [...completedStepIds],
-    completedMachineTypeIds,
     updatedAt: new Date().toISOString(),
   };
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // Авто-сохранение в Firestore с дебаунсом 800мс
-  // ─────────────────────────────────────────────────────────────────────────
 
   const scheduleSave = () => {
     if (!sessionId) return;
@@ -133,50 +191,39 @@ export const ManagerCockpit: React.FC<ManagerCockpitProps> = ({ onBack }) => {
   };
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Начать новый звонок
+  // Управление сессией
   // ─────────────────────────────────────────────────────────────────────────
 
-  const startNewSession = async (name: string, machineIds: string[]) => {
+  const startNewSession = async () => {
+    const name = managerName || 'Менеджер';
     const newId = 'sess-' + Date.now().toString(36);
     const session: QualificationSession = {
       id: newId,
       managerName: name,
-      machineTypeIds: machineIds,
-      focusMachineTypeId: machineIds[0] ?? null,
       status: 'active',
-      slots: {},
-      pendingSlots: [],
+      tasks: [],
+      activeTaskId: null,
+      universalSlots: {},
+      universalPendingSlots: [],
       currentStepId: null,
-      completedStepIds: [],
-      completedMachineTypeIds: [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
     await createQualSession(session).catch(console.error);
     setSessionId(newId);
-    setFocusMachineTypeId(machineIds[0] ?? null);
   };
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // Возобновить сохранённую сессию
-  // ─────────────────────────────────────────────────────────────────────────
 
   const resumeSession = (s: QualificationSession) => {
-    setSessionId(s.id);
-    setClientMachineTypeIds(s.machineTypeIds);
-    setFocusMachineTypeId(s.focusMachineTypeId);
-    setCompletedMachineTypeIds(s.completedMachineTypeIds);
-    setSlots(s.slots);
-    setPendingSlots(new Set(s.pendingSlots));
-    setCurrentStepId(s.currentStepId);
-    setCompletedStepIds(new Set(s.completedStepIds));
+    const m = migrateSession(s);
+    setSessionId(m.id);
+    setTasks(m.tasks ?? []);
+    setActiveTaskId(m.activeTaskId);
+    setUSlots(m.universalSlots ?? {});
+    setUPending(new Set(m.universalPendingSlots ?? []));
+    setCurrentStepId(m.currentStepId);
     setExpandedStepIds(new Set());
-    setSavedSessions((prev) => prev.filter((x) => x.id !== s.id));
+    setSavedSessions(prev => prev.filter(x => x.id !== s.id));
   };
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // Поставить на паузу / завершить
-  // ─────────────────────────────────────────────────────────────────────────
 
   const pauseSession = () => {
     if (!sessionId) return;
@@ -190,9 +237,15 @@ export const ManagerCockpit: React.FC<ManagerCockpitProps> = ({ onBack }) => {
     handleReset();
   };
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Ввод имени менеджера
-  // ─────────────────────────────────────────────────────────────────────────
+  const handleReset = () => {
+    setSessionId(null);
+    setTasks([]);
+    setActiveTaskId(null);
+    setUSlots({});
+    setUPending(new Set());
+    setCurrentStepId(null);
+    setExpandedStepIds(new Set());
+  };
 
   const confirmManagerName = (name: string) => {
     const trimmed = name.trim();
@@ -201,145 +254,161 @@ export const ManagerCockpit: React.FC<ManagerCockpitProps> = ({ onBack }) => {
     setManagerName(trimmed);
     setShowNameModal(false);
     setLoadingSessions(true);
-    fetchQualSessions(trimmed)
-      .then(setSavedSessions)
-      .finally(() => setLoadingSessions(false));
+    fetchQualSessions(trimmed).then(setSavedSessions).finally(() => setLoadingSessions(false));
   };
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Сброс состояния (новый звонок)
+  // Управление задачами
   // ─────────────────────────────────────────────────────────────────────────
 
-  const handleReset = () => {
-    setSessionId(null);
-    setClientMachineTypeIds([]);
-    setFocusMachineTypeId(null);
-    setCompletedMachineTypeIds([]);
+  const addTask = () => {
+    const taskId = 'task-' + Date.now().toString(36);
+    const newTask: QualificationTask = {
+      id: taskId,
+      label: `Задача ${tasks.length + 1}`,
+      machineTypeId: null,
+      slots: {},
+      pendingSlots: [],
+      completedStepIds: [],
+    };
+    setTasks(prev => [...prev, newTask]);
+    setActiveTaskId(taskId);
     setCurrentStepId(null);
-    setCompletedStepIds(new Set());
     setExpandedStepIds(new Set());
-    setSlots({});
-    setPendingSlots(new Set());
+    scheduleSave();
+  };
+
+  const updateTask = (taskId: string, patch: Partial<QualificationTask>) => {
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...patch } : t));
+    scheduleSave();
+  };
+
+  const removeTask = (taskId: string) => {
+    const remaining = tasks.filter(t => t.id !== taskId);
+    setTasks(remaining);
+    if (activeTaskId === taskId) {
+      setActiveTaskId(remaining[remaining.length - 1]?.id ?? null);
+      setCurrentStepId(null);
+      setExpandedStepIds(new Set());
+    }
+    scheduleSave();
   };
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Прогресс
+  // Прогресс задачи для отображения в табе
   // ─────────────────────────────────────────────────────────────────────────
 
-  const sorted: ScriptNode[] = [...scriptNodes]
-    .filter((n) => !focusMachineTypeId || !n.machineTypeIds?.length || n.machineTypeIds.includes(focusMachineTypeId))
-    .filter((n) => !n.scriptType || n.scriptType === 'qualification')
-    .sort((a, b) => a.order - b.order);
-
-  const total = sorted.length;
-  const done = sorted.filter((n) => completedStepIds.has(n.id)).length;
-  const progressPct = total > 0 ? Math.round((done / total) * 100) : 0;
-  const currentStep = currentStepId ? sorted.find((n) => n.id === currentStepId) ?? null : null;
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // Авто-переход к следующему типу станка при 100%
-  // ─────────────────────────────────────────────────────────────────────────
-
-  useEffect(() => {
-    if (
-      focusMachineTypeId &&
-      progressPct === 100 &&
-      !completedMachineTypeIds.includes(focusMachineTypeId)
-    ) {
-      const updated = [...completedMachineTypeIds, focusMachineTypeId];
-      setCompletedMachineTypeIds(updated);
-      const nextIncomplete = clientMachineTypeIds.find((id) => !updated.includes(id));
-      if (nextIncomplete) {
-        setFocusMachineTypeId(nextIncomplete);
-        setCompletedStepIds(new Set());
-      }
-      scheduleSave();
-    }
-  }, [progressPct, focusMachineTypeId]);
+  const getTaskProgress = (task: QualificationTask): { done: number; total: number } => {
+    const mtId = task.machineTypeId;
+    const taskSteps = scriptNodes
+      .filter(n => !mtId || !n.machineTypeIds?.length || n.machineTypeIds.includes(mtId))
+      .filter(n => !n.scriptType || n.scriptType === 'qualification');
+    return {
+      done: taskSteps.filter(n => task.completedStepIds.includes(n.id)).length,
+      total: taskSteps.length,
+    };
+  };
 
   // ─────────────────────────────────────────────────────────────────────────
-  // МП: адаптивная фильтрация
+  // Этапы скрипта
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const toggleStep = (id: string) => {
+    setExpandedStepIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+    setCurrentStepId(id);
+    scheduleSave();
+  };
+
+  const toggleDone = (e: React.MouseEvent, stepId: string) => {
+    e.stopPropagation();
+    if (!activeTaskId) return;
+    setTasks(prev => prev.map(t => {
+      if (t.id !== activeTaskId) return t;
+      const doneSet = new Set(t.completedStepIds);
+      doneSet.has(stepId) ? doneSet.delete(stepId) : doneSet.add(stepId);
+      return { ...t, completedStepIds: [...doneSet] };
+    }));
+    scheduleSave();
+  };
+
+  const toggleMp = (id: string) => {
+    setExpandedMpIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Слоты
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const handleUSlotChange = (key: string, value: string) => {
+    setUSlots(prev => ({ ...prev, [key]: value }));
+    scheduleSave();
+  };
+  const toggleUPending = (key: string) => {
+    setUPending(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
+    scheduleSave();
+  };
+  const handleTaskSlotChange = (key: string, value: string) => {
+    if (!activeTaskId) return;
+    setTasks(prev => prev.map(t =>
+      t.id === activeTaskId ? { ...t, slots: { ...t.slots, [key]: value } } : t,
+    ));
+    scheduleSave();
+  };
+  const toggleTaskPending = (key: string) => {
+    if (!activeTaskId) return;
+    setTasks(prev => prev.map(t => {
+      if (t.id !== activeTaskId) return t;
+      const p = new Set(t.pendingSlots);
+      p.has(key) ? p.delete(key) : p.add(key);
+      return { ...t, pendingSlots: [...p] };
+    }));
+    scheduleSave();
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Адаптивная фильтрация МП
   // ─────────────────────────────────────────────────────────────────────────
 
   const ALWAYS_SHOWN_CATEGORIES = new Set(['Общее', 'Формулировки']);
 
   const matchesMachineType = (mp: MicroPresentation) =>
-    !focusMachineTypeId || !mp.machineTypeIds?.length || mp.machineTypeIds.includes(focusMachineTypeId);
+    !activeTask?.machineTypeId || !mp.machineTypeIds?.length || mp.machineTypeIds.includes(activeTask.machineTypeId);
 
-  const isPublishedMp = (mp: MicroPresentation) => mp.isPublished !== false;
-
-  // МП показывается если хотя бы одно условие слота выполнено
   const matchesSlotConditions = (mp: MicroPresentation): boolean => {
     if (!mp.slotConditions || Object.keys(mp.slotConditions).length === 0) return false;
     return Object.entries(mp.slotConditions).some(([slotKey, values]) => {
-      const filled = slots[slotKey]?.toLowerCase().trim();
-      return !!filled && values.some((v) => filled.includes(v.toLowerCase()));
+      const filled = activeSlots[slotKey]?.toLowerCase().trim();
+      return !!filled && values.some(v => filled.includes(v.toLowerCase()));
     });
   };
 
   const relevantMps = (step: ScriptNode | null): { regular: MicroPresentation[]; slotBased: MicroPresentation[] } => {
-    const base = microPresentations.filter((mp) => matchesMachineType(mp) && isPublishedMp(mp));
-
-    // МП активированные заполненными слотами — показываем отдельным блоком
-    const slotBased = base.filter((mp) => matchesSlotConditions(mp));
-
+    const base = microPresentations.filter(mp => matchesMachineType(mp) && mp.isPublished !== false);
+    const slotBased = base.filter(mp => matchesSlotConditions(mp));
     let regular: MicroPresentation[];
     if (!step) {
-      regular = base.filter((mp) => ALWAYS_SHOWN_CATEGORIES.has(mp.category) && !matchesSlotConditions(mp));
+      regular = base.filter(mp => ALWAYS_SHOWN_CATEGORIES.has(mp.category) && !matchesSlotConditions(mp));
     } else {
       const linked = step.microPresentationIds ?? [];
       if (linked.length > 0) {
-        regular = base.filter((mp) => linked.includes(mp.id) && !matchesSlotConditions(mp));
+        regular = base.filter(mp => linked.includes(mp.id) && !matchesSlotConditions(mp));
       } else {
-        const currentIdx = sorted.findIndex((n) => n.id === step.id);
-        const nextStep = currentIdx >= 0 ? sorted[currentIdx + 1] : null;
+        const idx = sorted.findIndex(n => n.id === step.id);
+        const nextStep = idx >= 0 ? sorted[idx + 1] : null;
         const cats = new Set<string>(ALWAYS_SHOWN_CATEGORIES);
         if (step.category) cats.add(step.category);
         if (nextStep?.category) cats.add(nextStep.category);
-        regular = base.filter((mp) => cats.has(mp.category) && !matchesSlotConditions(mp));
+        regular = base.filter(mp => cats.has(mp.category) && !matchesSlotConditions(mp));
       }
     }
-
     return { regular, slotBased };
   };
 
+  const { regular: regularMps, slotBased: slotMps } = relevantMps(currentStep);
+
   // ─────────────────────────────────────────────────────────────────────────
-  // Обработчики
+  // Шестерёнка (Gear)
   // ─────────────────────────────────────────────────────────────────────────
-
-  const toggleStep = (id: string) => {
-    setExpandedStepIds((prev) => {
-      const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next;
-    });
-    setCurrentStepId(id);
-    scheduleSave();
-  };
-
-  const toggleDone = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    setCompletedStepIds((prev) => {
-      const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next;
-    });
-    scheduleSave();
-  };
-
-  const toggleMp = (id: string) => {
-    setExpandedMpIds((prev) => {
-      const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next;
-    });
-  };
-
-  const handleSlotChange = (key: string, value: string) => {
-    setSlots((prev) => ({ ...prev, [key]: value }));
-    scheduleSave();
-  };
-
-  const toggleSlotPending = (key: string) => {
-    setPendingSlots((prev) => {
-      const next = new Set(prev); next.has(key) ? next.delete(key) : next.add(key); return next;
-    });
-    scheduleSave();
-  };
 
   const handleGearSubmit = () => {
     if (!gearText.trim()) return;
@@ -354,32 +423,73 @@ export const ManagerCockpit: React.FC<ManagerCockpitProps> = ({ onBack }) => {
         source: 'cockpit',
         scriptType: 'qualification',
         stageName: currentStep?.title,
-        machineTypeId: focusMachineTypeId ?? undefined,
+        machineTypeId: activeTask?.machineTypeId ?? undefined,
         scriptNodeId: currentStepId ?? undefined,
       },
       status: 'new',
       createdAt: new Date().toISOString(),
     };
     addFeedbackNote(note);
-    setGearText(''); setGearUrgent(false); setGearSent(true);
+    setGearText('');
+    setGearUrgent(false);
+    setGearSent(true);
     setTimeout(() => { setGearSent(false); setGearOpen(false); }, 1500);
   };
 
   // ─────────────────────────────────────────────────────────────────────────
-  // МП для текущего шага
+  // Вспомогательный рендер: слот
   // ─────────────────────────────────────────────────────────────────────────
 
-  const { regular: regularMps, slotBased: slotMps } = relevantMps(currentStep);
+  const renderSlot = (
+    slot: QualificationSlot,
+    value: string,
+    isPending: boolean,
+    onChange: (key: string, val: string) => void,
+    onTogglePending: (key: string) => void,
+  ) => {
+    const isFilled = !!value;
+    return (
+      <div key={slot.key} className="flex items-center gap-1.5">
+        <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+          isFilled ? 'bg-green-500' : isPending ? 'bg-amber-400' : 'bg-gray-300'
+        }`} />
+        <span className="text-[10px] text-gray-500 flex-shrink-0 w-[72px]">{slot.label}:</span>
+        {isFilled ? (
+          <button
+            className="text-[10px] font-bold text-green-700 bg-green-50 px-1.5 py-0.5 rounded flex-1 text-left truncate"
+            onClick={() => onChange(slot.key, '')}
+          >
+            {value}
+          </button>
+        ) : (
+          <div className="flex gap-1 flex-1">
+            <input
+              className="flex-1 text-[10px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:border-calidad-blue min-w-0"
+              placeholder="уточнить..."
+              value={value}
+              onChange={e => onChange(slot.key, e.target.value)}
+            />
+            <button
+              onClick={() => onTogglePending(slot.key)}
+              title="Ждём ответа"
+              className={`text-[9px] px-1 py-0.5 rounded flex-shrink-0 ${
+                isPending ? 'bg-amber-100 text-amber-600' : 'bg-gray-100 text-gray-400 hover:bg-amber-50'
+              }`}
+            >⏳</button>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Рендер МП карточки
+  // Вспомогательный рендер: карточка МП
   // ─────────────────────────────────────────────────────────────────────────
 
   const renderMpCard = (mp: MicroPresentation, badge?: string) => {
     const isExpanded = expandedMpIds.has(mp.id);
     const colorClass = CATEGORY_COLORS[mp.category] ?? CATEGORY_COLORS['Общее'];
     const methodText = mp.methodology || mp.content;
-
     return (
       <div
         key={mp.id}
@@ -394,7 +504,7 @@ export const ManagerCockpit: React.FC<ManagerCockpitProps> = ({ onBack }) => {
               {mp.technical && <span className="text-[9px] opacity-60">🔘</span>}
               {methodText && <span className="text-[9px] opacity-60">💬</span>}
               {mp.compromise && <span className="text-[9px] opacity-60">💰</span>}
-              {(mp.tags ?? []).slice(0, 2).map((tag) => (
+              {(mp.tags ?? []).slice(0, 2).map(tag => (
                 <span key={tag} className="text-[9px] opacity-50">#{tag}</span>
               ))}
             </div>
@@ -408,7 +518,6 @@ export const ManagerCockpit: React.FC<ManagerCockpitProps> = ({ onBack }) => {
             : <ChevronDown size={13} className="flex-shrink-0 opacity-60" />
           }
         </div>
-
         {isExpanded && (
           <div className="border-t border-current border-opacity-20 space-y-2 p-3 pt-2">
             {mp.technical && (
@@ -439,88 +548,122 @@ export const ManagerCockpit: React.FC<ManagerCockpitProps> = ({ onBack }) => {
   // РЕНДЕР
   // ─────────────────────────────────────────────────────────────────────────
 
+  const isCallActive = !!sessionId;
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
 
-      {/* Top bar */}
-      <header className="bg-white border-b border-gray-200 px-6 py-4 flex-shrink-0">
-        <div className="flex items-center gap-4 mb-3">
+      {/* ── Шапка ── */}
+      <header className="bg-white border-b border-gray-200 px-5 py-3 flex-shrink-0">
+        <div className="flex items-center gap-3">
           <button
             onClick={onBack}
-            className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-600 font-bold text-xs transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-600 font-bold text-xs transition-colors"
           >
             <ArrowLeft size={14} /> Назад
           </button>
           <div className="flex-1">
-            <h1 className="text-lg font-black text-calidad-blue">
+            <h1 className="text-base font-black text-calidad-blue leading-tight">
               CALIDAD <span className="text-calidad-red">COCKPIT</span>
             </h1>
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-              Скрипт продаж в режиме реального времени
+              Скрипт продаж · живой звонок
             </p>
           </div>
-
-          {/* Имя менеджера */}
           <button
             onClick={() => { setNameInput(managerName); setShowNameModal(true); }}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-500 hover:border-calidad-blue transition-colors"
           >
-            <User size={12} />
-            <span>{managerName || 'Указать имя'}</span>
+            <User size={12} /> <span>{managerName || 'Указать имя'}</span>
           </button>
-
-          {/* Кнопки сессии */}
-          {clientMachineTypeIds.length > 0 && (
+          {isCallActive && (
             <>
-              <button
-                onClick={pauseSession}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg text-xs font-bold hover:bg-amber-100 transition-colors"
-              >
+              <button onClick={pauseSession} className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg text-xs font-bold hover:bg-amber-100 transition-colors">
                 <Pause size={12} /> Пауза
               </button>
-              <button
-                onClick={finishSession}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 text-green-700 border border-green-200 rounded-lg text-xs font-bold hover:bg-green-100 transition-colors"
-              >
+              <button onClick={finishSession} className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 text-green-700 border border-green-200 rounded-lg text-xs font-bold hover:bg-green-100 transition-colors">
                 <CheckCircle size={12} /> Завершить
               </button>
-              <button
-                onClick={handleReset}
-                className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-500 font-bold text-xs transition-colors"
-              >
+              <button onClick={handleReset} className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-500 font-bold text-xs transition-colors">
                 Новый
               </button>
             </>
           )}
         </div>
 
-        {/* Прогресс-бар (только когда идёт звонок) */}
-        {clientMachineTypeIds.length > 0 && (
-          <div className="flex items-center gap-3">
-            <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-calidad-blue rounded-full transition-all duration-500"
-                style={{ width: `${progressPct}%` }}
-              />
+        {/* Вкладки задач + прогресс-бар (только во время звонка) */}
+        {isCallActive && (
+          <div className="mt-3 space-y-2">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {tasks.map(task => {
+                const isActive = task.id === activeTaskId;
+                const mt = task.machineTypeId ? machineTypes.find(m => m.id === task.machineTypeId) : null;
+                const { done: tDone, total: tTotal } = getTaskProgress(task);
+                return (
+                  <button
+                    key={task.id}
+                    onClick={() => {
+                      setActiveTaskId(task.id);
+                      setCurrentStepId(null);
+                      setExpandedStepIds(new Set());
+                    }}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${
+                      isActive
+                        ? 'bg-calidad-blue text-white border-calidad-blue'
+                        : 'bg-white text-gray-600 border-gray-200 hover:border-calidad-blue hover:text-calidad-blue'
+                    }`}
+                  >
+                    <span className="max-w-[100px] truncate">{task.label}</span>
+                    {mt && (
+                      <span className={`text-[10px] ${isActive ? 'opacity-70' : 'text-gray-400'}`}>
+                        · {mt.name}
+                      </span>
+                    )}
+                    {tTotal > 0 && (
+                      <span className={`text-[10px] tabular-nums ${isActive ? 'opacity-70' : 'text-gray-400'}`}>
+                        {tDone}/{tTotal}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+              <button
+                onClick={addTask}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold border border-dashed border-gray-300 text-gray-400 hover:border-calidad-blue hover:text-calidad-blue transition-colors"
+              >
+                <Plus size={12} /> Задача
+              </button>
             </div>
-            <span className="text-xs font-bold text-gray-500 w-14 text-right">
-              {done}/{total} ({progressPct}%)
-            </span>
+
+            {/* Прогресс активной задачи */}
+            {activeTask && total > 0 && (
+              <div className="flex items-center gap-2">
+                <div className="flex-1 h-1 bg-gray-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-calidad-blue rounded-full transition-all duration-500"
+                    style={{ width: `${progressPct}%` }}
+                  />
+                </div>
+                <span className="text-[10px] font-bold text-gray-400 tabular-nums w-16 text-right">
+                  {done}/{total} ({progressPct}%)
+                </span>
+              </div>
+            )}
           </div>
         )}
       </header>
 
-      {/* Main content */}
+      {/* ── Основная область ── */}
       <div className="flex flex-1 overflow-hidden">
 
-        {/* LEFT: Script + Slots */}
+        {/* ── ЛЕВАЯ ПАНЕЛЬ ── */}
         <div className="w-[55%] flex flex-col border-r border-gray-200 overflow-hidden">
 
-          {/* ── Старт: выбор станков или список сохранённых сессий ── */}
-          {clientMachineTypeIds.length === 0 ? (
+          {!isCallActive ? (
+            /* ── Стартовый экран ── */
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
 
-              {/* Сохранённые сессии */}
+              {/* Прерванные звонки */}
               {(savedSessions.length > 0 || loadingSessions) && (
                 <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
                   <div className="flex items-center gap-2 mb-3">
@@ -533,20 +676,24 @@ export const ManagerCockpit: React.FC<ManagerCockpitProps> = ({ onBack }) => {
                     <p className="text-xs text-gray-400">Загрузка...</p>
                   ) : (
                     <div className="space-y-2">
-                      {savedSessions.map((s) => {
-                        const mtNames = s.machineTypeIds
-                          .map((id) => machineTypes.find((m) => m.id === id)?.name ?? id)
-                          .join(', ');
-                        const filledCount = Object.keys(s.slots).filter((k) => s.slots[k]).length;
-                        const date = new Date(s.updatedAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+                      {savedSessions.map(s => {
+                        const m = migrateSession(s);
+                        const summary = m.tasks.length > 0
+                          ? m.tasks.map(t => {
+                            const mt = t.machineTypeId ? machineTypes.find(x => x.id === t.machineTypeId)?.name : null;
+                            return mt ? `${t.label}: ${mt}` : t.label;
+                          }).join(' · ')
+                          : 'Без задач';
+                        const date = new Date(s.updatedAt).toLocaleDateString('ru-RU', {
+                          day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+                        });
+                        const clientName = m.universalSlots?.client_name || '';
                         return (
                           <div key={s.id} className="flex items-center gap-3 bg-white rounded-lg p-3 border border-amber-100">
                             <div className="flex-1 min-w-0">
-                              <p className="text-xs font-bold text-gray-800 truncate">{mtNames || 'Без станка'}</p>
-                              <p className="text-[10px] text-gray-400">{date} · {filledCount} слотов заполнено</p>
-                              {s.slots['client_name'] && (
-                                <p className="text-[10px] text-gray-500">{s.slots['client_name']}</p>
-                              )}
+                              <p className="text-xs font-bold text-gray-800 truncate">{summary}</p>
+                              <p className="text-[10px] text-gray-400">{date}</p>
+                              {clientName && <p className="text-[10px] text-gray-500">{clientName}</p>}
                             </div>
                             <div className="flex gap-1.5">
                               <button
@@ -556,7 +703,10 @@ export const ManagerCockpit: React.FC<ManagerCockpitProps> = ({ onBack }) => {
                                 <Play size={11} /> Продолжить
                               </button>
                               <button
-                                onClick={() => { deleteQualSession(s.id).catch(console.error); setSavedSessions((p) => p.filter((x) => x.id !== s.id)); }}
+                                onClick={() => {
+                                  deleteQualSession(s.id).catch(console.error);
+                                  setSavedSessions(p => p.filter(x => x.id !== s.id));
+                                }}
                                 className="p-1.5 text-gray-300 hover:text-red-400 transition-colors"
                               >
                                 <X size={13} />
@@ -570,47 +720,21 @@ export const ManagerCockpit: React.FC<ManagerCockpitProps> = ({ onBack }) => {
                 </div>
               )}
 
-              {/* Новый звонок: выбор типов станков */}
-              <div className="bg-white rounded-xl border border-gray-200 p-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <Cpu size={14} className="text-gray-400" />
-                  <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-                    {managerName ? `${managerName} — новый звонок` : 'Новый звонок'}
-                  </span>
+              {/* Новый звонок */}
+              <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
+                <div className="w-16 h-16 rounded-2xl bg-calidad-blue/10 flex items-center justify-center mx-auto mb-4">
+                  <Phone size={28} className="text-calidad-blue" />
                 </div>
-                <p className="text-xs text-gray-400 mb-3">Какие станки интересуют клиента?</p>
-                <div className="flex flex-wrap gap-1.5 mb-4">
-                  {machineTypes.map((mt) => (
-                    <button
-                      key={mt.id}
-                      onClick={() => setClientMachineTypeIds((prev) =>
-                        prev.includes(mt.id) ? prev.filter((x) => x !== mt.id) : [...prev, mt.id]
-                      )}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors ${
-                        clientMachineTypeIds.includes(mt.id)
-                          ? 'bg-calidad-blue text-white'
-                          : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                      }`}
-                    >
-                      {mt.name}
-                    </button>
-                  ))}
-                </div>
+                <h2 className="text-base font-black text-gray-800 mb-2">Новый звонок</h2>
+                <p className="text-xs text-gray-400 mb-6 max-w-xs mx-auto">
+                  Начните звонок — задачи клиента добавляются в процессе разговора через кнопку <strong>«+ Задача»</strong>
+                </p>
                 <button
-                  onClick={async () => {
-                    if (clientMachineTypeIds.length === 0) return;
-                    const name = managerName || 'Менеджер';
-                    await startNewSession(name, clientMachineTypeIds);
-                    setFocusMachineTypeId(clientMachineTypeIds[0]);
-                  }}
-                  disabled={clientMachineTypeIds.length === 0}
-                  className={`w-full px-4 py-2.5 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-2 ${
-                    clientMachineTypeIds.length === 0
-                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                      : 'bg-calidad-blue text-white hover:bg-blue-800'
-                  }`}
+                  onClick={startNewSession}
+                  className="w-full max-w-xs mx-auto px-6 py-3 bg-calidad-blue text-white rounded-xl text-sm font-bold hover:bg-blue-800 transition-colors flex items-center justify-center gap-2"
                 >
-                  <Phone size={13} /> Начать звонок
+                  <Phone size={15} />
+                  {managerName ? `${managerName} — начать звонок` : 'Начать звонок'}
                 </button>
               </div>
             </div>
@@ -618,60 +742,95 @@ export const ManagerCockpit: React.FC<ManagerCockpitProps> = ({ onBack }) => {
           ) : (
             /* ── Активный звонок ── */
             <>
-              <div className="bg-white border-b border-gray-100 flex-shrink-0">
+              {/* Панель данных: задача + слоты */}
+              <div className="bg-white border-b border-gray-100 flex-shrink-0 px-4 py-3 space-y-3">
 
-                {/* Вкладки типов станков */}
-                <div className="px-4 pt-3 pb-0 flex gap-1.5 flex-wrap">
-                  {clientMachineTypeIds.map((mtId) => {
-                    const isCompleted = completedMachineTypeIds.includes(mtId);
-                    const mt = machineTypes.find((m) => m.id === mtId);
-                    return (
+                {/* Активная задача: название + тип станка */}
+                {activeTask ? (
+                  <div className="border border-calidad-blue/20 rounded-xl p-3 bg-blue-50/30 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        className="flex-1 text-xs font-bold text-gray-800 bg-transparent border-b border-calidad-blue/30 focus:outline-none focus:border-calidad-blue py-0.5 placeholder:text-gray-400"
+                        value={activeTask.label}
+                        onChange={e => updateTask(activeTask.id, { label: e.target.value })}
+                        placeholder="Название задачи клиента..."
+                      />
                       <button
-                        key={mtId}
-                        onClick={() => { if (!isCompleted) { setFocusMachineTypeId(mtId); setCompletedStepIds(new Set()); scheduleSave(); } }}
-                        className={`px-3 py-1.5 rounded-t-lg text-xs font-bold border-b-2 transition-colors ${
-                          isCompleted
-                            ? 'bg-green-50 text-green-600 border-green-300'
-                            : focusMachineTypeId === mtId
-                            ? 'bg-white text-calidad-blue border-calidad-blue'
-                            : 'bg-gray-100 text-gray-500 border-transparent hover:bg-gray-200'
-                        }`}
+                        onClick={() => removeTask(activeTask.id)}
+                        className="text-gray-300 hover:text-red-400 transition-colors flex-shrink-0"
+                        title="Удалить задачу"
                       >
-                        {isCompleted ? '✓ ' : ''}{mt?.name}
+                        <Trash2 size={13} />
                       </button>
-                    );
-                  })}
-                </div>
-
-                {/* Слоты квалификации */}
-                <div className="px-4 py-3">
-                  {/* Универсальные слоты */}
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Общие данные</p>
-                  <div className="grid grid-cols-3 gap-1.5 mb-3">
-                    {UNIVERSAL_SLOTS.map((slot) => renderSlotInput(slot))}
+                    </div>
+                    {/* Выбор типа станка */}
+                    <div className="flex flex-wrap gap-1">
+                      {machineTypes.map(mt => (
+                        <button
+                          key={mt.id}
+                          onClick={() => updateTask(activeTask.id, {
+                            machineTypeId: activeTask.machineTypeId === mt.id ? null : mt.id,
+                          })}
+                          className={`px-2 py-0.5 rounded text-[10px] font-bold transition-colors ${
+                            activeTask.machineTypeId === mt.id
+                              ? 'bg-calidad-blue text-white'
+                              : 'bg-white text-gray-500 border border-gray-200 hover:border-calidad-blue'
+                          }`}
+                        >
+                          {mt.name}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-
-                  {/* Слоты типа станка */}
-                  {machineSpecificSlots.length > 0 && (
-                    <>
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">
-                        {focusMachineType?.name ?? 'Станок'}
+                ) : (
+                  tasks.length === 0 && (
+                    <div className="text-center py-1">
+                      <p className="text-xs text-gray-400">
+                        Нажмите <strong className="text-calidad-blue">+ Задача</strong> выше, чтобы добавить задачу клиента
                       </p>
-                      <div className="grid grid-cols-2 gap-1.5">
-                        {machineSpecificSlots.map((slot) => renderSlotInput(slot))}
-                      </div>
-                    </>
-                  )}
+                    </div>
+                  )
+                )}
+
+                {/* Универсальные слоты */}
+                <div>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Общие данные</p>
+                  <div className="space-y-1">
+                    {UNIVERSAL_SLOTS.map(slot => renderSlot(
+                      slot,
+                      uSlots[slot.key] ?? '',
+                      uPending.has(slot.key),
+                      handleUSlotChange,
+                      toggleUPending,
+                    ))}
+                  </div>
                 </div>
+
+                {/* Слоты специфичные для типа станка активной задачи */}
+                {machineSpecificSlots.length > 0 && (
+                  <div>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">
+                      {activeMachineType?.name ?? 'Станок'}
+                    </p>
+                    <div className="space-y-1">
+                      {machineSpecificSlots.map(slot => renderSlot(
+                        slot,
+                        activeTask?.slots[slot.key] ?? '',
+                        new Set(activeTask?.pendingSlots ?? []).has(slot.key),
+                        handleTaskSlotChange,
+                        toggleTaskPending,
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Этапы скрипта */}
               <div className="flex-1 overflow-y-auto p-4 space-y-2">
                 {sorted.map((node, idx) => {
-                  const isDone = completedStepIds.has(node.id);
+                  const isDone = activeCompletedStepIds.has(node.id);
                   const isCurrent = currentStepId === node.id;
                   const isExpanded = expandedStepIds.has(node.id);
-
                   return (
                     <div
                       key={node.id}
@@ -684,39 +843,41 @@ export const ManagerCockpit: React.FC<ManagerCockpitProps> = ({ onBack }) => {
                       }`}
                       onClick={() => toggleStep(node.id)}
                     >
-                      <div className="flex items-center gap-3 p-4">
-                        <button onClick={(e) => toggleDone(e, node.id)} className="flex-shrink-0">
+                      <div className="flex items-center gap-3 p-3">
+                        <button onClick={e => toggleDone(e, node.id)} className="flex-shrink-0">
                           {isDone
-                            ? <CheckCircle size={20} className="text-green-500" />
-                            : <Circle size={20} className={isCurrent ? 'text-calidad-blue' : 'text-gray-300'} />
+                            ? <CheckCircle size={18} className="text-green-500" />
+                            : <Circle size={18} className={isCurrent ? 'text-calidad-blue' : 'text-gray-300'} />
                           }
                         </button>
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0 ${
+                        <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black flex-shrink-0 ${
                           isCurrent ? 'bg-calidad-blue text-white' : isDone ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500'
                         }`}>
                           {idx + 1}
                         </div>
-                        <span className={`flex-1 text-sm font-bold ${
+                        <span className={`flex-1 text-xs font-bold ${
                           isCurrent ? 'text-calidad-blue' : isDone ? 'text-gray-400 line-through' : 'text-gray-800'
                         }`}>
                           {node.title}
                         </span>
                         {node.category && (
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold flex-shrink-0 ${CATEGORY_COLORS[node.category] ?? CATEGORY_COLORS['Общее']}`}>
+                          <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold flex-shrink-0 border ${CATEGORY_COLORS[node.category] ?? CATEGORY_COLORS['Общее']}`}>
                             {node.category}
                           </span>
                         )}
-                        {isExpanded ? <ChevronUp size={14} className="text-gray-400 flex-shrink-0" /> : <ChevronDown size={14} className="text-gray-400 flex-shrink-0" />}
+                        {isExpanded
+                          ? <ChevronUp size={13} className="text-gray-400 flex-shrink-0" />
+                          : <ChevronDown size={13} className="text-gray-400 flex-shrink-0" />
+                        }
                       </div>
-
                       {isExpanded && (
-                        <div className="px-4 pb-4 border-t border-gray-100">
-                          <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-100">
-                            <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{node.content}</p>
+                        <div className="px-4 pb-3 border-t border-gray-100">
+                          <div className="mt-2 p-3 bg-blue-50 rounded-lg border border-blue-100">
+                            <p className="text-xs text-gray-700 leading-relaxed whitespace-pre-wrap">{node.content}</p>
                           </div>
                           {(node.tips ?? []).length > 0 && (
-                            <div className="mt-3">
-                              <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Советы</p>
+                            <div className="mt-2">
+                              <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Советы</p>
                               <ul className="space-y-1">
                                 {(node.tips ?? []).map((tip, i) => (
                                   <li key={i} className="flex items-start gap-2 text-xs text-gray-600">
@@ -736,7 +897,8 @@ export const ManagerCockpit: React.FC<ManagerCockpitProps> = ({ onBack }) => {
                 {sorted.length === 0 && (
                   <div className="text-center py-16 text-gray-400">
                     <BookText size={32} className="mx-auto mb-3 opacity-40" />
-                    <p className="text-sm">Скрипт пуст. Добавьте этапы в разделе «Управление скриптом».</p>
+                    <p className="text-sm">Скрипт пуст.</p>
+                    <p className="text-xs mt-1">Добавьте этапы в разделе «Управление скриптом».</p>
                   </div>
                 )}
               </div>
@@ -755,7 +917,7 @@ export const ManagerCockpit: React.FC<ManagerCockpitProps> = ({ onBack }) => {
           )}
         </div>
 
-        {/* RIGHT: Micro-presentations */}
+        {/* ── ПРАВАЯ ПАНЕЛЬ: МП ── */}
         <div className="flex-1 flex flex-col overflow-hidden bg-white">
           <div className="px-5 py-3 border-b border-gray-100 flex-shrink-0">
             <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">
@@ -763,26 +925,21 @@ export const ManagerCockpit: React.FC<ManagerCockpitProps> = ({ onBack }) => {
             </p>
             <p className="text-xs text-gray-400 mt-0.5">
               {regularMps.length + slotMps.length} блоков
-              {slotMps.length > 0 && ` · ${slotMps.length} по заполненным слотам`}
-              {!currentStep && ' · Выберите этап слева'}
+              {slotMps.length > 0 && ` · ${slotMps.length} по слотам`}
+              {!currentStep && isCallActive && ' · Выберите этап слева'}
             </p>
           </div>
-
           <div className="flex-1 overflow-y-auto p-4 space-y-2">
-            {/* Слот-активированные МП — приоритет */}
             {slotMps.length > 0 && (
               <div className="space-y-2">
                 <p className="text-[10px] font-bold text-green-600 uppercase tracking-wider px-1">
                   ✦ Актуально для этого клиента
                 </p>
-                {slotMps.map((mp) => renderMpCard(mp, '⚡ слот'))}
+                {slotMps.map(mp => renderMpCard(mp, '⚡ слот'))}
                 {regularMps.length > 0 && <div className="border-t border-gray-100 pt-2" />}
               </div>
             )}
-
-            {/* Обычные МП */}
-            {regularMps.map((mp) => renderMpCard(mp))}
-
+            {regularMps.map(mp => renderMpCard(mp))}
             {regularMps.length === 0 && slotMps.length === 0 && (
               <div className="text-center py-12 text-gray-400">
                 <p className="text-sm">
@@ -804,22 +961,21 @@ export const ManagerCockpit: React.FC<ManagerCockpitProps> = ({ onBack }) => {
             <input
               className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-calidad-blue mb-4"
               value={nameInput}
-              onChange={(e) => setNameInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') confirmManagerName(nameInput); }}
+              onChange={e => setNameInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') confirmManagerName(nameInput); }}
               placeholder="Напр.: Иван"
               autoFocus
             />
             <div className="flex gap-2">
-              <button
-                onClick={() => setShowNameModal(false)}
-                className="flex-1 px-4 py-2 text-xs font-bold text-gray-500 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
-              >
+              <button onClick={() => setShowNameModal(false)} className="flex-1 px-4 py-2 text-xs font-bold text-gray-500 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors">
                 Отмена
               </button>
               <button
                 onClick={() => confirmManagerName(nameInput)}
                 disabled={!nameInput.trim()}
-                className={`flex-1 px-4 py-2 text-xs font-bold text-white rounded-xl transition-colors ${nameInput.trim() ? 'bg-calidad-blue hover:bg-blue-800' : 'bg-gray-200 cursor-not-allowed'}`}
+                className={`flex-1 px-4 py-2 text-xs font-bold text-white rounded-xl transition-colors ${
+                  nameInput.trim() ? 'bg-calidad-blue hover:bg-blue-800' : 'bg-gray-200 cursor-not-allowed'
+                }`}
               >
                 Сохранить
               </button>
@@ -841,16 +997,14 @@ export const ManagerCockpit: React.FC<ManagerCockpitProps> = ({ onBack }) => {
                 <X size={16} />
               </button>
             </div>
-
             {currentStep && (
               <div className="mb-3 px-2 py-1.5 bg-gray-50 rounded-lg text-[10px] text-gray-500">
                 📍 Этап: <strong>{currentStep.title}</strong>
-                {focusMachineTypeId && (
-                  <> · Станок: <strong>{machineTypes.find((m) => m.id === focusMachineTypeId)?.name}</strong></>
+                {activeTask?.machineTypeId && (
+                  <> · Станок: <strong>{machineTypes.find(m => m.id === activeTask.machineTypeId)?.name}</strong></>
                 )}
               </div>
             )}
-
             {gearSent ? (
               <div className="text-center py-4 text-green-600 font-bold text-sm">
                 ✓ Заметка отправлена руководителю
@@ -861,13 +1015,13 @@ export const ManagerCockpit: React.FC<ManagerCockpitProps> = ({ onBack }) => {
                   className="w-full text-sm border border-gray-200 rounded-xl p-3 resize-none focus:outline-none focus:border-amber-400 mb-3"
                   rows={4}
                   value={gearText}
-                  onChange={(e) => setGearText(e.target.value)}
+                  onChange={e => setGearText(e.target.value)}
                   placeholder="Клиент спросил про... / Не знал как ответить на... / Нужна кнопка..."
                   autoFocus
                 />
                 <div className="flex items-center justify-between">
                   <button
-                    onClick={() => setGearUrgent((p) => !p)}
+                    onClick={() => setGearUrgent(p => !p)}
                     className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${
                       gearUrgent ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500 hover:bg-red-50'
                     }`}
@@ -892,49 +1046,4 @@ export const ManagerCockpit: React.FC<ManagerCockpitProps> = ({ onBack }) => {
       )}
     </div>
   );
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // Вспомогательный рендер слота (вынесен внутрь компонента)
-  // ─────────────────────────────────────────────────────────────────────────
-
-  function renderSlotInput(slot: QualificationSlot) {
-    const value = slots[slot.key] ?? '';
-    const isPending = pendingSlots.has(slot.key);
-    const isFilled = !!value;
-
-    return (
-      <div key={slot.key} className="flex items-center gap-1.5">
-        <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-          isFilled ? 'bg-green-500' : isPending ? 'bg-amber-400' : 'bg-gray-300'
-        }`} />
-        <span className="text-[10px] text-gray-500 flex-shrink-0 min-w-[56px]">{slot.label}:</span>
-        {isFilled ? (
-          <button
-            className="text-[10px] font-bold text-green-700 bg-green-50 px-1.5 py-0.5 rounded flex-1 text-left truncate"
-            onClick={() => handleSlotChange(slot.key, '')}
-          >
-            {value}
-          </button>
-        ) : (
-          <div className="flex gap-1 flex-1">
-            <input
-              className="flex-1 text-[10px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:border-calidad-blue min-w-0"
-              placeholder="уточнить..."
-              value={value}
-              onChange={(e) => handleSlotChange(slot.key, e.target.value)}
-            />
-            <button
-              onClick={() => toggleSlotPending(slot.key)}
-              className={`text-[9px] px-1 py-0.5 rounded flex-shrink-0 ${
-                isPending ? 'bg-amber-100 text-amber-600' : 'bg-gray-100 text-gray-400 hover:bg-amber-50'
-              }`}
-              title="Ждём ответа"
-            >
-              ⏳
-            </button>
-          </div>
-        )}
-      </div>
-    );
-  }
 };

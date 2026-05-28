@@ -141,19 +141,27 @@ export interface MachineType {
   siteUrl?: string;
 }
 
+// Задача в рамках звонка: что нужно сделать + какой станок решает
+export interface QualificationTask {
+  id: string;
+  label: string;              // напр. «Резка фанеры»
+  machineTypeId: string | null;
+  slots: Record<string, string>;       // слоты специфичные для этого типа станка
+  pendingSlots: string[];
+  completedStepIds: string[];          // выполненные этапы скрипта по этой задаче
+}
+
 // Сессия квалификации — данные одного звонка, сохраняемые в Firestore
 export interface QualificationSession {
   id: string;
   managerName: string;
   clientPhone?: string;
-  machineTypeIds: string[];
-  focusMachineTypeId: string | null;
   status: 'active' | 'paused' | 'done';
-  slots: Record<string, string>;
-  pendingSlots: string[];
+  tasks: QualificationTask[];          // задачи создаются ВО ВРЕМЯ звонка
+  activeTaskId: string | null;
+  universalSlots: Record<string, string>;   // общие: имя клиента, бюджет, срок
+  universalPendingSlots: string[];
   currentStepId: string | null;
-  completedStepIds: string[];
-  completedMachineTypeIds: string[];
   createdAt: string;
   updatedAt: string;
 }
