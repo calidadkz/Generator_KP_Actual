@@ -22,6 +22,7 @@ import {
   saveDialogueTexts,
   updateDialogueTexts,
 } from '../../lib/dialogueStorage';
+import { logApiUsage } from '../../lib/apiUsageLog';
 import { getClassificationLabel, getConfidenceColor } from '../../lib/dialogueClassifier';
 import {
   BatchInsights,
@@ -403,6 +404,7 @@ export const AdminDialogues: React.FC = () => {
     updateDialogue(id, { cleanStatus: 'cleaning', cleanErrorMessage: undefined });
     try {
       const cleanedText = await cleanDialogueText(rawText);
+      logApiUsage({ model: 'gemini-2.5-flash', module: 'dialogue_clean', inputTokens: Math.round(rawText.length / 4), outputTokens: Math.round(cleanedText.length / 4) }).catch(() => {});
       await updateDialogueTexts(ref, { rawText, cleanedText });
       const updated = { cleanStatus: 'ready' as const };
       updateDialogue(id, updated);
@@ -477,6 +479,12 @@ export const AdminDialogues: React.FC = () => {
         }
       }
 
+      logApiUsage({
+        model: result.usedModel || (selectedProvider === 'openai' ? (selectedModel || 'gpt-4o') : (selectedModel || 'gemini-2.5-flash')),
+        module: 'dialogue_analyze',
+        inputTokens: Math.round((texts.cleanedText || texts.rawText).length / 4),
+        outputTokens: 500,
+      }).catch(() => {});
       updateDialogue(d.id, {
         analysisStatus: 'done',
         extractedData: finalExtractedData,
@@ -505,6 +513,12 @@ export const AdminDialogues: React.FC = () => {
         selectedModel || undefined,
         selectedProvider,
       );
+      logApiUsage({
+        model: selectedProvider === 'openai' ? (selectedModel || 'gpt-4o') : (selectedModel || 'gemini-2.5-flash'),
+        module: 'batch_insights',
+        inputTokens: Math.round(JSON.stringify(done.map((d) => d.extractedData!)).length / 4),
+        outputTokens: 400,
+      }).catch(() => {});
       addBatchInsight(insights);
     } catch (err) {
       setBatchError(err instanceof Error ? err.message : String(err));

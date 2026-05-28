@@ -8,8 +8,8 @@ export interface AgentApiMessage {
 }
 
 export type AgentChatResult =
-  | { type: 'text'; content: string }
-  | { type: 'tool_call'; toolCall: { name: string; input: Record<string, unknown>; id: string } };
+  | { type: 'text'; content: string; usage?: { inputTokens: number; outputTokens: number } }
+  | { type: 'tool_call'; toolCall: { name: string; input: Record<string, unknown>; id: string }; usage?: { inputTokens: number; outputTokens: number } };
 
 // ─── Определения инструментов (Anthropic JSON Schema формат) ─────────────────
 
@@ -310,7 +310,12 @@ export async function agentChat(
   const data = (await response.json()) as {
     content?: AnthropicContent[];
     stop_reason?: string;
+    usage?: { input_tokens: number; output_tokens: number };
   };
+
+  const usage = data.usage
+    ? { inputTokens: data.usage.input_tokens, outputTokens: data.usage.output_tokens }
+    : undefined;
 
   const toolUseBlock = data.content?.find(b => b.type === 'tool_use');
   if (toolUseBlock && toolUseBlock.name && toolUseBlock.input) {
@@ -321,9 +326,10 @@ export async function agentChat(
         input: toolUseBlock.input,
         id: toolUseBlock.id || `toolu_${Date.now()}`,
       },
+      usage,
     };
   }
 
   const textBlock = data.content?.find(b => b.type === 'text');
-  return { type: 'text', content: textBlock?.text ?? '' };
+  return { type: 'text', content: textBlock?.text ?? '', usage };
 }

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeft, MessageSquare, BookOpen, Presentation, Cpu, Library, FileText, Settings, Sparkles } from 'lucide-react';
+import { ArrowLeft, MessageSquare, BookOpen, Presentation, Cpu, Library, FileText, Settings, Sparkles, DollarSign } from 'lucide-react';
 import { AdminDialogues } from './AdminDialogues';
 import { AdminScript } from './AdminScript';
 import { AdminMicroPresentations } from './AdminMicroPresentations';
@@ -8,9 +8,10 @@ import { HolisticLibraryView } from './HolisticLibraryView';
 import { AdminArticles } from './AdminArticles';
 import { AdminFeedback } from './AdminFeedback';
 import { AgentPanel } from './AgentPanel';
+import { CostDashboard } from './CostDashboard';
 import { useSalesStore } from '../../store/useSalesStore';
 
-type AdminTab = 'dialogues' | 'script' | 'micropresentations' | 'machinetypes' | 'library' | 'articles' | 'feedback' | 'agent';
+type AdminTab = 'dialogues' | 'script' | 'micropresentations' | 'machinetypes' | 'library' | 'articles' | 'feedback' | 'agent' | 'costs';
 
 const TABS: { id: AdminTab; label: string; icon: React.ElementType }[] = [
   { id: 'dialogues',          label: 'Диалоги',          icon: MessageSquare },
@@ -21,6 +22,7 @@ const TABS: { id: AdminTab; label: string; icon: React.ElementType }[] = [
   { id: 'articles',           label: 'Статьи',            icon: FileText },
   { id: 'feedback',           label: 'Обратная связь',    icon: Settings },
   { id: 'agent',              label: 'Агент',             icon: Sparkles },
+  { id: 'costs',              label: 'Затраты',           icon: DollarSign },
 ];
 
 interface AdminPanelProps {
@@ -42,6 +44,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
       case 'articles':           return <AdminArticles />;
       case 'feedback':           return <AdminFeedback />;
       case 'agent':              return <AgentPanel />;
+      case 'costs':              return <CostDashboard />;
     }
   };
 

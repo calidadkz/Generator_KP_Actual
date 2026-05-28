@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User, Loader2, CheckCircle, XCircle, AlertTriangle, Sparkles } from 'lucide-react';
 import { useSalesStore } from '../../store/useSalesStore';
 import { MicroPresentation, ScriptNode } from '../../types';
+import { logApiUsage } from '../../lib/apiUsageLog';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -311,8 +312,12 @@ export const AgentPanel: React.FC = () => {
       }
 
       const data = (await res.json()) as
-        | { type: 'text'; content: string }
-        | { type: 'tool_call'; toolCall: ToolCall };
+        | { type: 'text'; content: string; usage?: { inputTokens: number; outputTokens: number } }
+        | { type: 'tool_call'; toolCall: ToolCall; usage?: { inputTokens: number; outputTokens: number } };
+
+      if (data.usage) {
+        logApiUsage({ model: 'claude-sonnet-4-6', module: 'agent', inputTokens: data.usage.inputTokens, outputTokens: data.usage.outputTokens }).catch(() => {});
+      }
 
       if (data.type === 'text') {
         return { updatedHistory: currentHistory, text: data.content };
