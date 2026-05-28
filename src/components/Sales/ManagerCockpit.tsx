@@ -649,94 +649,169 @@ export const ManagerCockpit: React.FC<ManagerCockpitProps> = ({ onBack }) => {
       </header>
 
       {/* ── Основная область ── */}
-      <div className="flex flex-1 overflow-hidden">
+      {!isCallActive ? (
+
+        /* ══════════════════════════════════════════════════════════════════
+           СТАРТОВЫЙ ЭКРАН — полная ширина, без правой панели МП
+           ══════════════════════════════════════════════════════════════════ */
+        <div className="flex-1 overflow-y-auto">
+          <div className="max-w-xl mx-auto px-6 py-8 space-y-5">
+
+            {/* Кнопка нового звонка — всегда сверху */}
+            <button
+              onClick={startNewSession}
+              className="w-full py-3.5 bg-calidad-blue text-white rounded-2xl text-sm font-black hover:bg-blue-800 transition-colors flex items-center justify-center gap-2 shadow-md shadow-blue-200"
+            >
+              <Phone size={16} />
+              {managerName ? `${managerName} — начать звонок` : 'Начать новый звонок'}
+            </button>
+
+            {/* Незакрытые звонки */}
+            {loadingSessions && (
+              <p className="text-xs text-center text-gray-400">Загрузка сессий...</p>
+            )}
+
+            {!loadingSessions && savedSessions.length > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                    Незакрытые звонки ({savedSessions.length})
+                  </p>
+                  {savedSessions.length > 1 && (
+                    <button
+                      onClick={() => {
+                        const empties = savedSessions.filter(s => {
+                          const m = migrateSession(s);
+                          return m.tasks.length === 0 && !m.universalSlots?.client_name;
+                        });
+                        empties.forEach(s => deleteQualSession(s.id).catch(console.error));
+                        setSavedSessions(prev => prev.filter(s => {
+                          const m = migrateSession(s);
+                          return m.tasks.length > 0 || !!m.universalSlots?.client_name;
+                        }));
+                      }}
+                      className="text-[10px] text-red-400 hover:text-red-600 transition-colors"
+                    >
+                      Очистить пустые
+                    </button>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  {savedSessions.map(s => {
+                    const m = migrateSession(s);
+                    const clientName = m.universalSlots?.client_name?.trim() || '';
+                    const budget = m.universalSlots?.budget?.trim() || '';
+                    const hasTasks = m.tasks.length > 0;
+
+                    // Возраст сессии
+                    const ageDays = Math.floor((Date.now() - new Date(s.updatedAt).getTime()) / 86_400_000);
+                    const isStale = ageDays >= 7;
+
+                    const timeLabel = ageDays === 0
+                      ? new Date(s.updatedAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+                      : ageDays === 1 ? 'вчера'
+                      : `${ageDays} дн. назад`;
+
+                    return (
+                      <div
+                        key={s.id}
+                        className={`bg-white rounded-xl border px-4 py-3 ${
+                          isStale ? 'border-red-100' : hasTasks ? 'border-gray-200' : 'border-gray-100 opacity-70'
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          {/* Статус-точка */}
+                          <div className="mt-1 flex-shrink-0">
+                            <div className="w-2 h-2 rounded-full bg-amber-400" title="На паузе" />
+                          </div>
+
+                          <div className="flex-1 min-w-0">
+                            {/* Клиент + время */}
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-sm font-bold text-gray-800 truncate">
+                                {clientName || 'Клиент не указан'}
+                              </span>
+                              <span className={`text-[10px] flex-shrink-0 ${isStale ? 'text-red-400 font-bold' : 'text-gray-400'}`}>
+                                {timeLabel}
+                              </span>
+                            </div>
+
+                            {/* Задачи */}
+                            {hasTasks ? (
+                              <div className="space-y-0.5 mb-1.5">
+                                {m.tasks.map(t => {
+                                  const mt = t.machineTypeId
+                                    ? machineTypes.find(x => x.id === t.machineTypeId)
+                                    : null;
+                                  const { done: tDone, total: tTotal } = getTaskProgress(t);
+                                  return (
+                                    <div key={t.id} className="flex items-center gap-1.5">
+                                      <span className="text-[10px] text-gray-500">•</span>
+                                      <span className="text-xs text-gray-700 font-medium">{t.label}</span>
+                                      {mt && (
+                                        <span className="text-[10px] text-calidad-blue bg-blue-50 px-1.5 py-0.5 rounded font-bold">
+                                          {mt.name}
+                                        </span>
+                                      )}
+                                      {tTotal > 0 && (
+                                        <span className="text-[10px] text-gray-400 ml-auto">{tDone}/{tTotal}</span>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <p className="text-xs text-gray-400 mb-1.5">Задачи не добавлены</p>
+                            )}
+
+                            {/* Бюджет если заполнен */}
+                            {budget && (
+                              <span className="text-[10px] text-gray-500 bg-gray-50 px-1.5 py-0.5 rounded">
+                                💰 {budget}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Кнопки */}
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <button
+                              onClick={() => resumeSession(s)}
+                              className="flex items-center gap-1 px-2.5 py-1.5 bg-calidad-blue text-white text-xs font-bold rounded-lg hover:bg-blue-800 transition-colors"
+                            >
+                              <Play size={11} /> Продолжить
+                            </button>
+                            <button
+                              onClick={() => {
+                                deleteQualSession(s.id).catch(console.error);
+                                setSavedSessions(p => p.filter(x => x.id !== s.id));
+                              }}
+                              className="p-1.5 text-gray-300 hover:text-red-400 transition-colors"
+                            >
+                              <X size={13} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+      ) : (
+
+        /* ══════════════════════════════════════════════════════════════════
+           АКТИВНЫЙ ЗВОНОК — две колонки: скрипт + МП
+           ══════════════════════════════════════════════════════════════════ */
+        <div className="flex flex-1 overflow-hidden">
 
         {/* ── ЛЕВАЯ ПАНЕЛЬ ── */}
         <div className="w-[55%] flex flex-col border-r border-gray-200 overflow-hidden">
-
-          {!isCallActive ? (
-            /* ── Стартовый экран ── */
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-
-              {/* Прерванные звонки */}
-              {(savedSessions.length > 0 || loadingSessions) && (
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <RotateCcw size={14} className="text-amber-600" />
-                    <span className="text-xs font-bold text-amber-700 uppercase tracking-wider">
-                      Продолжить прерванный звонок
-                    </span>
-                  </div>
-                  {loadingSessions ? (
-                    <p className="text-xs text-gray-400">Загрузка...</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {savedSessions.map(s => {
-                        const m = migrateSession(s);
-                        const summary = m.tasks.length > 0
-                          ? m.tasks.map(t => {
-                            const mt = t.machineTypeId ? machineTypes.find(x => x.id === t.machineTypeId)?.name : null;
-                            return mt ? `${t.label}: ${mt}` : t.label;
-                          }).join(' · ')
-                          : 'Без задач';
-                        const date = new Date(s.updatedAt).toLocaleDateString('ru-RU', {
-                          day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
-                        });
-                        const clientName = m.universalSlots?.client_name || '';
-                        return (
-                          <div key={s.id} className="flex items-center gap-3 bg-white rounded-lg p-3 border border-amber-100">
-                            <div className="flex-1 min-w-0">
-                              <p className="text-xs font-bold text-gray-800 truncate">{summary}</p>
-                              <p className="text-[10px] text-gray-400">{date}</p>
-                              {clientName && <p className="text-[10px] text-gray-500">{clientName}</p>}
-                            </div>
-                            <div className="flex gap-1.5">
-                              <button
-                                onClick={() => resumeSession(s)}
-                                className="flex items-center gap-1 px-2.5 py-1.5 bg-amber-500 text-white text-xs font-bold rounded-lg hover:bg-amber-600 transition-colors"
-                              >
-                                <Play size={11} /> Продолжить
-                              </button>
-                              <button
-                                onClick={() => {
-                                  deleteQualSession(s.id).catch(console.error);
-                                  setSavedSessions(p => p.filter(x => x.id !== s.id));
-                                }}
-                                className="p-1.5 text-gray-300 hover:text-red-400 transition-colors"
-                              >
-                                <X size={13} />
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Новый звонок */}
-              <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
-                <div className="w-16 h-16 rounded-2xl bg-calidad-blue/10 flex items-center justify-center mx-auto mb-4">
-                  <Phone size={28} className="text-calidad-blue" />
-                </div>
-                <h2 className="text-base font-black text-gray-800 mb-2">Новый звонок</h2>
-                <p className="text-xs text-gray-400 mb-6 max-w-xs mx-auto">
-                  Начните звонок — задачи клиента добавляются в процессе разговора через кнопку <strong>«+ Задача»</strong>
-                </p>
-                <button
-                  onClick={startNewSession}
-                  className="w-full max-w-xs mx-auto px-6 py-3 bg-calidad-blue text-white rounded-xl text-sm font-bold hover:bg-blue-800 transition-colors flex items-center justify-center gap-2"
-                >
-                  <Phone size={15} />
-                  {managerName ? `${managerName} — начать звонок` : 'Начать звонок'}
-                </button>
-              </div>
-            </div>
-
-          ) : (
-            /* ── Активный звонок ── */
-            <>
+          {/* ── Активный звонок ── */}
+          <>
               {/* Панель данных: задача + слоты */}
               <div className="bg-white border-b border-gray-100 flex-shrink-0 px-4 py-3 space-y-3">
 
@@ -909,7 +984,6 @@ export const ManagerCockpit: React.FC<ManagerCockpitProps> = ({ onBack }) => {
                 </button>
               </div>
             </>
-          )}
         </div>
 
         {/* ── ПРАВАЯ ПАНЕЛЬ: МП ── */}
@@ -946,6 +1020,8 @@ export const ManagerCockpit: React.FC<ManagerCockpitProps> = ({ onBack }) => {
           </div>
         </div>
       </div>
+
+      )}
 
       {/* ── Модал: имя менеджера ── */}
       {showNameModal && (
