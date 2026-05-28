@@ -10,7 +10,7 @@ const UNIVERSAL_SLOTS: QualificationSlot[] = [
   { key: 'timeline',    label: 'Срок' },
 ];
 
-const CATEGORIES = ['Открытие', 'Квалификация', 'Возражения', 'Закрытие', 'Общее'];
+const CATEGORIES = ['Открытие', 'Квалификация', 'Возражения', 'Закрытие', 'Общее', 'Формулировки'];
 
 function newId() {
   return 'mp-' + Date.now().toString(36);
@@ -22,6 +22,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   'Возражения':    'bg-orange-100 text-orange-700',
   'Закрытие':      'bg-purple-100 text-purple-700',
   'Общее':         'bg-gray-100 text-gray-600',
+  'Формулировки':  'bg-yellow-100 text-yellow-700',
 };
 
 export const AdminMicroPresentations: React.FC = () => {

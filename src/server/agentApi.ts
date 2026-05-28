@@ -1,40 +1,35 @@
 export interface AgentApiMessage {
   role: 'user' | 'assistant' | 'tool_result';
   text?: string;
-  toolCall?: { name: string; args: Record<string, unknown> };
+  toolCall?: { name: string; args: Record<string, unknown>; id?: string };
   toolName?: string;
   toolResult?: string;
+  toolCallId?: string; // id из tool_use блока Anthropic для сопоставления с tool_result
 }
 
 export type AgentChatResult =
   | { type: 'text'; content: string }
   | { type: 'tool_call'; toolCall: { name: string; input: Record<string, unknown>; id: string } };
 
-interface GeminiPart {
-  text?: string;
-  functionCall?: { name: string; args: Record<string, unknown> };
-  functionResponse?: { name: string; response: Record<string, unknown> };
-}
+// ─── Определения инструментов (Anthropic JSON Schema формат) ─────────────────
 
-interface GeminiContent {
-  role: 'user' | 'model';
-  parts: GeminiPart[];
-}
+const MP_CATEGORIES = ['Открытие', 'Квалификация', 'Возражения', 'Закрытие', 'Общее', 'Формулировки'] as const;
+const SCRIPT_CATEGORIES = ['Открытие', 'Квалификация', 'Возражения', 'Закрытие', 'Общее'] as const;
 
 const AGENT_TOOLS = [
   {
     name: 'get_micro_presentations',
     description: 'Получить список атомов знаний (МП). Используй для поиска существующих перед созданием новых.',
-    parameters: {
-      type: 'OBJECT',
+    input_schema: {
+      type: 'object',
       properties: {
         category: {
-          type: 'STRING',
+          type: 'string',
           description: 'Фильтр по категории',
-          enum: ['Открытие', 'Квалификация', 'Возражения', 'Закрытие', 'Общее'],
+          enum: MP_CATEGORIES,
         },
         query: {
-          type: 'STRING',
+          type: 'string',
           description: 'Поиск по тексту в названии или содержании',
         },
       },
@@ -42,40 +37,49 @@ const AGENT_TOOLS = [
   },
   {
     name: 'create_micro_presentation',
-    description: 'Создать новый атом знаний как черновик (isPublished=false). Перед созданием проверь похожие через get_micro_presentations.',
-    parameters: {
-      type: 'OBJECT',
+    description: 'Создать новый атом знаний как черновик. Перед созданием проверь похожие через get_micro_presentations.',
+    input_schema: {
+      type: 'object',
       properties: {
-        title: { type: 'STRING', description: 'Название — короткое, ёмкое' },
+        title: { type: 'string', description: 'Название — короткое, ёмкое' },
         category: {
-          type: 'STRING',
+          type: 'string',
           description: 'Категория',
-          enum: ['Открытие', 'Квалификация', 'Возражения', 'Закрытие', 'Общее'],
+          enum: MP_CATEGORIES,
         },
-        technical: { type: 'STRING', description: 'Технический факт: что это, цифры, характеристики' },
-        methodology: { type: 'STRING', description: 'Методология: как объяснить клиенту, что сказать' },
-        compromise: { type: 'STRING', description: 'Компромисс: что предложить при нехватке бюджета' },
+        technical: { type: 'string', description: 'Технический факт: что это, цифры, характеристики' },
+        methodology: { type: 'string', description: 'Методология: как объяснить клиенту, что сказать' },
+        compromise: { type: 'string', description: 'Компромисс: что предложить при нехватке бюджета' },
         machineTypeIds: {
-          type: 'STRING',
-          description: 'ID типов станков через запятую (пусто = универсальная)',
+          type: 'string',
+          description: 'ID типов станков через запятую (пусто = универсальная). ID берёшь из get_machine_types.',
         },
-        tags: { type: 'STRING', description: 'Теги через запятую' },
+        tags: { type: 'string', description: 'Теги через запятую' },
+        slotConditions: {
+          type: 'string',
+          description: 'JSON: условия показа атома по заполненным слотам. Пример: {"material":["акрил","пвх"],"thickness":["до 10"]}. Ключи slot.key из get_machine_types.',
+        },
       },
       required: ['title', 'category', 'methodology'],
     },
   },
   {
     name: 'update_micro_presentation',
-    description: 'Обновить существующий атом знаний. Используй точный ID из get_micro_presentations.',
-    parameters: {
-      type: 'OBJECT',
+    description: 'Обновить существующий атом знаний. ID берёшь из get_micro_presentations.',
+    input_schema: {
+      type: 'object',
       properties: {
-        id: { type: 'STRING', description: 'ID атома знаний (mp-xxx)' },
-        title: { type: 'STRING', description: 'Новое название' },
-        technical: { type: 'STRING', description: 'Обновлённый технический факт' },
-        methodology: { type: 'STRING', description: 'Обновлённая методология' },
-        compromise: { type: 'STRING', description: 'Обновлённая стратегия компромисса' },
-        tags: { type: 'STRING', description: 'Теги через запятую' },
+        id: { type: 'string', description: 'ID атома знаний (mp-xxx)' },
+        title: { type: 'string', description: 'Новое название' },
+        technical: { type: 'string', description: 'Обновлённый технический факт' },
+        methodology: { type: 'string', description: 'Обновлённая методология' },
+        compromise: { type: 'string', description: 'Обновлённый компромисс' },
+        tags: { type: 'string', description: 'Теги через запятую' },
+        slotConditions: {
+          type: 'string',
+          description: 'JSON условий показа по слотам. Пример: {"material":["металл"]}. Передай "" чтобы очистить.',
+        },
+        isPublished: { type: 'boolean', description: 'true = опубликовать, false = оставить черновиком' },
       },
       required: ['id'],
     },
@@ -83,11 +87,11 @@ const AGENT_TOOLS = [
   {
     name: 'get_script_nodes',
     description: 'Получить этапы скрипта продаж.',
-    parameters: {
-      type: 'OBJECT',
+    input_schema: {
+      type: 'object',
       properties: {
         scriptType: {
-          type: 'STRING',
+          type: 'string',
           description: 'Тип скрипта',
           enum: ['qualification', 'closing', 'calling'],
         },
@@ -95,68 +99,75 @@ const AGENT_TOOLS = [
     },
   },
   {
-    name: 'get_dialogues',
-    description: 'Получить список диалогов с метаданными. Используй чтобы выбрать диалог для наполнения библиотеки.',
-    parameters: {
-      type: 'OBJECT',
+    name: 'create_script_node',
+    description: 'Создать этап скрипта продаж. Источник — conversationSteps из диалогов.',
+    input_schema: {
+      type: 'object',
       properties: {
-        limit: { type: 'NUMBER', description: 'Количество диалогов (по умолчанию 10, максимум 30)' },
+        title: { type: 'string', description: 'Название этапа' },
+        content: { type: 'string', description: 'Что говорить на этом этапе' },
+        category: {
+          type: 'string',
+          description: 'Категория этапа',
+          enum: SCRIPT_CATEGORIES,
+        },
+        scriptType: {
+          type: 'string',
+          description: 'Тип скрипта',
+          enum: ['qualification', 'closing', 'calling'],
+        },
+        tips: { type: 'string', description: 'Практические советы через | (разделитель)' },
+      },
+      required: ['title', 'content', 'category'],
+    },
+  },
+  {
+    name: 'get_dialogues',
+    description: 'Получить список диалогов с метаданными. Используй чтобы найти диалоги для наполнения библиотеки.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        limit: { type: 'number', description: 'Количество (по умолчанию 10, максимум 30)' },
       },
     },
   },
   {
     name: 'get_dialogue_content',
-    description: 'Получить полный анализ конкретного диалога: формулировки, техники продаж, боли клиента, предложенные МП, этапы разговора. Используй перед созданием атомов из диалога.',
-    parameters: {
-      type: 'OBJECT',
+    description: 'Получить полный анализ конкретного диалога: формулировки, техники, боли, предложенные МП, этапы разговора.',
+    input_schema: {
+      type: 'object',
       properties: {
-        id: { type: 'STRING', description: 'ID диалога из get_dialogues' },
+        id: { type: 'string', description: 'ID диалога из get_dialogues' },
       },
       required: ['id'],
     },
   },
   {
     name: 'get_machine_types',
-    description: 'Получить список типов станков с их ID и текущими квалификационными слотами. Используй чтобы узнать ID для привязки МП или для обновления слотов.',
-    parameters: {
-      type: 'OBJECT',
+    description: 'Получить список типов станков с ID и квалификационными слотами. Используй чтобы узнать ID для machineTypeIds и ключи для slotConditions.',
+    input_schema: {
+      type: 'object',
       properties: {},
     },
   },
   {
-    name: 'create_script_node',
-    description: 'Создать этап скрипта продаж. Источник — conversationSteps из диалогов или собственные знания о процессе продаж.',
-    parameters: {
-      type: 'OBJECT',
-      properties: {
-        title: { type: 'STRING', description: 'Название этапа, коротко' },
-        content: { type: 'STRING', description: 'Содержание — что говорить менеджеру на этом этапе' },
-        category: {
-          type: 'STRING',
-          description: 'Категория этапа',
-          enum: ['Открытие', 'Квалификация', 'Возражения', 'Закрытие', 'Общее'],
-        },
-        tips: { type: 'STRING', description: 'Практические советы через | (разделитель). Например: Уточни бюджет|Задай открытый вопрос' },
-      },
-      required: ['title', 'content', 'category'],
-    },
-  },
-  {
     name: 'update_machine_type',
-    description: 'Обновить квалификационные слоты типа станка — вопросы которые менеджер должен выяснить у клиента. Слот = пара key:label.',
-    parameters: {
-      type: 'OBJECT',
+    description: 'Обновить квалификационные слоты типа станка. Слот = пара key:label.',
+    input_schema: {
+      type: 'object',
       properties: {
-        id: { type: 'STRING', description: 'ID типа станка из get_machine_types' },
+        id: { type: 'string', description: 'ID типа станка из get_machine_types' },
         qualifiers: {
-          type: 'STRING',
-          description: 'Слоты через | в формате key:label. Например: material:Материал|thickness:Толщина мм|quantity:Тираж шт. Перезапишет существующие слоты.',
+          type: 'string',
+          description: 'Слоты через | в формате key:label. Например: material:Материал|thickness:Толщина мм. Перезапишет существующие.',
         },
       },
       required: ['id', 'qualifiers'],
     },
   },
 ];
+
+// ─── Системный промпт ─────────────────────────────────────────────────────────
 
 const SYSTEM_PROMPT_BASE = `Ты — Knowledge Architect системы CALIDAD.kz — B2B продажи лазерного и промышленного оборудования в Казахстане.
 
@@ -167,30 +178,37 @@ const SYSTEM_PROMPT_BASE = `Ты — Knowledge Architect системы CALIDAD.
 - methodology: методология эксперта (как объяснить клиенту, что сказать) — голубой фон
 - compromise: стратегия компромисса (что предложить при нехватке бюджета) — янтарный фон
 
+КАТЕГОРИИ АТОМОВ:
+- Открытие / Квалификация / Возражения / Закрытие / Общее — привязаны к этапу скрипта
+- Формулировки — ключевые речевые обороты, показываются менеджеру ВСЕГДА независимо от этапа
+
 НАПОЛНЕНИЕ ИЗ ДИАЛОГОВ (главный сценарий):
-Когда руководитель просит "заполни библиотеку из диалогов" или "создай атомы из диалога X":
-1. Вызови get_dialogues чтобы найти подходящие диалоги (со статусом analysisStatus=done)
-2. Вызови get_dialogue_content(id) для каждого — получишь formulations, techniques, suggestedMicroPresentations, conversationSteps
-3. suggestedMicroPresentations — уже готовые МП сформированные AI при анализе, используй их как основу
-4. formulations — ключевые фразы из реального разговора, включай в methodology
-5. conversationSteps — этапы реального разговора, используй для create_script_node
+1. Вызови get_dialogues → найди диалоги с analysisStatus=done
+2. Вызови get_dialogue_content(id) → получишь formulations, techniques, suggestedMicroPresentations, conversationSteps
+3. suggestedMicroPresentations — уже готовые МП от AI, используй как основу
+4. formulations — ключевые фразы → категория Формулировки
+5. conversationSteps — этапы разговора → create_script_node
 6. Перед каждым созданием проверяй дубли через get_micro_presentations
 
+УМНЫЙ ПОКАЗ МП (slotConditions):
+Атомы с slotConditions показываются менеджеру АВТОМАТИЧЕСКИ когда клиент называет нужные параметры.
+Пример: {"material":["акрил","пвх"]} → атом появится когда менеджер укажет материал акрил/пвх.
+Ключи слотов берёшь из get_machine_types → qualifiers[].key.
+
 ЗАПОЛНЕНИЕ КВАЛИФИКАЦИОННЫХ СЛОТОВ:
-1. Вызови get_machine_types чтобы увидеть текущие слоты
-2. Вызови update_machine_type с новыми слотами в формате key:label через |
-3. key — латиница без пробелов (material, thickness, quantity), label — по-русски
+1. get_machine_types → посмотри текущие слоты
+2. update_machine_type(id, qualifiers) → формат key:label через |
 
 ПРАВИЛА ПОВЕДЕНИЯ:
-1. Перед созданием МП — всегда проверяй дубли через get_micro_presentations
-2. Все записи создаются как черновики — руководитель подтверждает каждое действие
-3. Для массовых изменений — сначала покажи план списком, потом выполняй по одному
-4. Отвечай на русском языке
-5. При создании МП — заполняй все три уровня если есть информация
-6. Если задача неясна — уточни, не делай предположений
-7. machineTypeIds для МП берёшь из get_machine_types (поле id)`;
+1. Перед созданием МП — проверяй дубли через get_micro_presentations
+2. Все записи создаются как черновики (isPublished=false) — руководитель подтверждает каждое
+3. Для массовых изменений — сначала покажи план, потом выполняй по одному
+4. При создании МП — заполняй все три уровня если есть информация
+5. machineTypeIds для МП берёшь из get_machine_types`;
 
-function buildSystemPrompt(stats: { mpCount: number; publishedCount: number; draftCount: number; scriptCount: number; dialogueCount: number }): string {
+function buildSystemPrompt(stats: {
+  mpCount: number; publishedCount: number; draftCount: number; scriptCount: number; dialogueCount: number;
+}): string {
   return `${SYSTEM_PROMPT_BASE}
 
 ТЕКУЩЕЕ СОСТОЯНИЕ БАЗЫ:
@@ -199,94 +217,113 @@ function buildSystemPrompt(stats: { mpCount: number; publishedCount: number; dra
 - Диалогов: ${stats.dialogueCount}`;
 }
 
-function convertMessages(messages: AgentApiMessage[]): GeminiContent[] {
-  const contents: GeminiContent[] = [];
+// ─── Конвертация сообщений в формат Anthropic ─────────────────────────────────
 
-  for (const msg of messages) {
-    if (msg.role === 'tool_result' && msg.toolName && msg.toolResult !== undefined) {
-      contents.push({
-        role: 'user',
-        parts: [{
-          functionResponse: {
-            name: msg.toolName,
-            response: { result: msg.toolResult },
-          },
-        }],
-      });
+interface AnthropicContent {
+  type: string;
+  text?: string;
+  id?: string;
+  name?: string;
+  input?: Record<string, unknown>;
+  tool_use_id?: string;
+  content?: string;
+}
+
+interface AnthropicMessage {
+  role: 'user' | 'assistant';
+  content: string | AnthropicContent[];
+}
+
+function convertMessages(messages: AgentApiMessage[]): AnthropicMessage[] {
+  const result: AnthropicMessage[] = [];
+
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i];
+
+    if (msg.role === 'user' && msg.text) {
+      result.push({ role: 'user', content: msg.text });
+
     } else if (msg.role === 'assistant') {
       if (msg.toolCall) {
-        contents.push({
-          role: 'model',
-          parts: [{ functionCall: { name: msg.toolCall.name, args: msg.toolCall.args } }],
+        result.push({
+          role: 'assistant',
+          content: [{
+            type: 'tool_use',
+            id: msg.toolCall.id || `toolu_${i}`,
+            name: msg.toolCall.name,
+            input: msg.toolCall.args,
+          }],
         });
       } else if (msg.text) {
-        contents.push({ role: 'model', parts: [{ text: msg.text }] });
+        result.push({ role: 'assistant', content: msg.text });
       }
-    } else if (msg.role === 'user' && msg.text) {
-      contents.push({ role: 'user', parts: [{ text: msg.text }] });
+
+    } else if (msg.role === 'tool_result') {
+      result.push({
+        role: 'user',
+        content: [{
+          type: 'tool_result',
+          tool_use_id: msg.toolCallId || `toolu_${i - 1}`,
+          content: msg.toolResult || '',
+        }],
+      });
     }
   }
 
-  return contents;
+  return result;
 }
+
+// ─── Основная функция ─────────────────────────────────────────────────────────
 
 export async function agentChat(
   messages: AgentApiMessage[],
   stats: { mpCount: number; publishedCount: number; draftCount: number; scriptCount: number; dialogueCount: number },
   apiKey: string,
 ): Promise<AgentChatResult> {
-  const systemPrompt = buildSystemPrompt(stats);
-  const contents = convertMessages(messages);
+  const anthropicMessages = convertMessages(messages);
 
-  if (contents.length === 0) {
+  if (anthropicMessages.length === 0) {
     return { type: 'text', content: 'Нет сообщений для обработки.' };
   }
 
-  const requestBody = {
-    system_instruction: { parts: [{ text: systemPrompt }] },
-    contents,
-    tools: [{ function_declarations: AGENT_TOOLS }],
-    generation_config: {
-      temperature: 0.7,
-      max_output_tokens: 2048,
-    },
-  };
-
-  const model = 'gemini-2.5-flash';
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-
-  const response = await fetch(url, {
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(requestBody),
+    headers: {
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 4096,
+      system: buildSystemPrompt(stats),
+      messages: anthropicMessages,
+      tools: AGENT_TOOLS,
+    }),
   });
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(`Gemini API error (${response.status}): ${text.slice(0, 300)}`);
+    throw new Error(`Anthropic API error (${response.status}): ${text.slice(0, 400)}`);
   }
 
   const data = (await response.json()) as {
-    candidates?: Array<{
-      content?: { parts?: GeminiPart[] };
-    }>;
+    content?: AnthropicContent[];
+    stop_reason?: string;
   };
 
-  const parts = data.candidates?.[0]?.content?.parts ?? [];
-
-  for (const part of parts) {
-    if (part.functionCall) {
-      return {
-        type: 'tool_call',
-        toolCall: {
-          name: part.functionCall.name,
-          input: part.functionCall.args,
-          id: `call_${Date.now()}_${part.functionCall.name}`,
-        },
-      };
-    }
+  const toolUseBlock = data.content?.find(b => b.type === 'tool_use');
+  if (toolUseBlock && toolUseBlock.name && toolUseBlock.input) {
+    return {
+      type: 'tool_call',
+      toolCall: {
+        name: toolUseBlock.name,
+        input: toolUseBlock.input,
+        id: toolUseBlock.id || `toolu_${Date.now()}`,
+      },
+    };
   }
 
-  const text = parts.find((p) => p.text)?.text ?? '';
-  return { type: 'text', content: text };
+  const textBlock = data.content?.find(b => b.type === 'text');
+  return { type: 'text', content: textBlock?.text ?? '' };
 }

@@ -8,9 +8,10 @@ import { MicroPresentation, ScriptNode } from '../../types';
 interface ApiMessage {
   role: 'user' | 'assistant' | 'tool_result';
   text?: string;
-  toolCall?: { name: string; args: Record<string, unknown> };
+  toolCall?: { name: string; args: Record<string, unknown>; id?: string };
   toolName?: string;
   toolResult?: string;
+  toolCallId?: string; // для сопоставления tool_result → tool_use в Anthropic
 }
 
 interface ToolCall {
@@ -135,6 +136,10 @@ export const AgentPanel: React.FC = () => {
       }
 
       case 'create_micro_presentation': {
+        let parsedSlotConditions: Record<string, string[]> | undefined;
+        if (input.slotConditions) {
+          try { parsedSlotConditions = JSON.parse(String(input.slotConditions)); } catch { /* ignore */ }
+        }
         const mp: MicroPresentation = {
           id: 'mp-' + Date.now().toString(36),
           title: String(input.title || ''),
@@ -149,6 +154,7 @@ export const AgentPanel: React.FC = () => {
           tags: input.tags
             ? String(input.tags).split(',').map((s) => s.trim()).filter(Boolean)
             : [],
+          slotConditions: parsedSlotConditions,
           isPublished: false,
           createdBy: 'agent',
         };
@@ -167,6 +173,15 @@ export const AgentPanel: React.FC = () => {
         }
         if (input.compromise !== undefined) updates.compromise = String(input.compromise) || undefined;
         if (input.tags !== undefined) updates.tags = String(input.tags).split(',').map((s) => s.trim()).filter(Boolean);
+        if (input.isPublished !== undefined) updates.isPublished = Boolean(input.isPublished);
+        if (input.slotConditions !== undefined) {
+          const raw = String(input.slotConditions).trim();
+          if (!raw) {
+            updates.slotConditions = undefined;
+          } else {
+            try { updates.slotConditions = JSON.parse(raw); } catch { /* ignore */ }
+          }
+        }
         updateMicroPresentation(id, updates);
         return JSON.stringify({ success: true, message: `МП ${id} обновлена` });
       }
@@ -238,6 +253,9 @@ export const AgentPanel: React.FC = () => {
           title: String(input.title || ''),
           content: String(input.content || ''),
           category: String(input.category || 'Общее'),
+          scriptType: input.scriptType
+            ? (String(input.scriptType) as ScriptNode['scriptType'])
+            : 'qualification',
           tips: input.tips
             ? String(input.tips).split('|').map((s) => s.trim()).filter(Boolean)
             : [],
@@ -303,10 +321,10 @@ export const AgentPanel: React.FC = () => {
       if (data.type === 'tool_call') {
         const { toolCall } = data;
 
-        // Add assistant tool-call turn to history
+        // Add assistant tool-call turn to history (сохраняем id для Anthropic)
         currentHistory = [
           ...currentHistory,
-          { role: 'assistant', toolCall: { name: toolCall.name, args: toolCall.input } },
+          { role: 'assistant', toolCall: { name: toolCall.name, args: toolCall.input, id: toolCall.id } },
         ];
 
         if (READ_TOOLS.has(toolCall.name)) {
@@ -314,7 +332,7 @@ export const AgentPanel: React.FC = () => {
           const result = executeTool(toolCall.name, toolCall.input);
           currentHistory = [
             ...currentHistory,
-            { role: 'tool_result', toolName: toolCall.name, toolResult: result },
+            { role: 'tool_result', toolName: toolCall.name, toolResult: result, toolCallId: toolCall.id },
           ];
 
           // Add to display as auto-executed summary
@@ -392,7 +410,7 @@ export const AgentPanel: React.FC = () => {
       const result = executeTool(toolCall.name, toolCall.input);
       const newHistory: ApiMessage[] = [
         ...apiHistory,
-        { role: 'tool_result', toolName: toolCall.name, toolResult: result },
+        { role: 'tool_result', toolName: toolCall.name, toolResult: result, toolCallId: toolCall.id },
       ];
 
       const { updatedHistory, text, pendingTool } = await callAgent(newHistory);
@@ -431,7 +449,7 @@ export const AgentPanel: React.FC = () => {
     try {
       const newHistory: ApiMessage[] = [
         ...apiHistory,
-        { role: 'tool_result', toolName: toolCall.name, toolResult: '{"cancelled": true, "message": "Пользователь отклонил действие"}' },
+        { role: 'tool_result', toolName: toolCall.name, toolResult: '{"cancelled": true, "message": "Пользователь отклонил действие"}', toolCallId: toolCall.id },
       ];
 
       const { updatedHistory, text, pendingTool } = await callAgent(newHistory);

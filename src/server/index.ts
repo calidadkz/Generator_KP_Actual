@@ -52,6 +52,14 @@ function getOpenAIKey(): string {
   return key || '';
 }
 
+function getAnthropicKey(): string {
+  const key = process.env.ANTHROPIC_API_KEY;
+  if (!key) {
+    console.warn('[server] ANTHROPIC_API_KEY is not set - Agent features will not work');
+  }
+  return key || '';
+}
+
 // API endpoints
 app.post('/api/clean-text', async (req: Request, res: Response) => {
   try {
@@ -322,7 +330,7 @@ app.post('/api/agent-chat', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'messages array is required' });
     }
     const dbStats = stats ?? { mpCount: 0, publishedCount: 0, draftCount: 0, scriptCount: 0, dialogueCount: 0 };
-    const result = await agentChat(messages, dbStats, getApiKey());
+    const result = await agentChat(messages, dbStats, getAnthropicKey());
     res.json(result);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
