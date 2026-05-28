@@ -1,7 +1,14 @@
-import React, { useState } from 'react';
-import { Plus, Trash2, ChevronDown, ChevronUp, Tag, AlertTriangle, CheckCircle } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Plus, Trash2, ChevronDown, ChevronUp, Tag, AlertTriangle, CheckCircle, Zap } from 'lucide-react';
 import { useSalesStore } from '../../store/useSalesStore';
-import { MicroPresentation } from '../../types';
+import { MicroPresentation, QualificationSlot } from '../../types';
+
+// Универсальные слоты (дублируем из Cockpit для редактора)
+const UNIVERSAL_SLOTS: QualificationSlot[] = [
+  { key: 'client_name', label: 'Имя / Компания' },
+  { key: 'budget',      label: 'Бюджет' },
+  { key: 'timeline',    label: 'Срок' },
+];
 
 const CATEGORIES = ['Открытие', 'Квалификация', 'Возражения', 'Закрытие', 'Общее'];
 
@@ -24,6 +31,24 @@ export const AdminMicroPresentations: React.FC = () => {
   const [filterCategory, setFilterCategory] = useState<string>('');
   const [filterMachineTypeId, setFilterMachineTypeId] = useState<string>('');
   const [filterPublished, setFilterPublished] = useState<'all' | 'published' | 'drafts'>('all');
+
+  // Редактор slotConditions: отдельный pending-state на каждый MP
+  const [condKey, setCondKey] = useState<Record<string, string>>({});
+  const [condValues, setCondValues] = useState<Record<string, string>>({});
+
+  // Все доступные слоты: универсальные + из всех типов станков
+  const allSlotOptions = useMemo<QualificationSlot[]>(() => {
+    const seen = new Set<string>();
+    const result: QualificationSlot[] = [...UNIVERSAL_SLOTS];
+    UNIVERSAL_SLOTS.forEach((s) => seen.add(s.key));
+    machineTypes.forEach((mt) => {
+      (mt.qualifiers ?? []).forEach((q) => {
+        const slot = typeof q === 'string' ? { key: q, label: q } : q as QualificationSlot;
+        if (slot.key && !seen.has(slot.key)) { seen.add(slot.key); result.push(slot); }
+      });
+    });
+    return result;
+  }, [machineTypes]);
 
   const toggle = (id: string) => setExpanded((p) => ({ ...p, [id]: !p[id] }));
 
@@ -319,6 +344,92 @@ export const AdminMicroPresentations: React.FC = () => {
                     );
                   })}
                 </div>
+              </div>
+
+              {/* ── Slot Conditions (адаптивная фильтрация) ── */}
+              <div className="rounded-lg bg-green-50 border border-green-200 p-3">
+                <label className="text-xs font-bold text-green-700 block mb-1 flex items-center gap-1.5">
+                  <Zap size={12} /> УСЛОВИЯ СЛОТОВ
+                  <span className="font-normal text-green-500 ml-1">
+                    — МП появляется автоматически когда менеджер заполнил слот
+                  </span>
+                </label>
+
+                {/* Существующие условия */}
+                {Object.keys(mp.slotConditions ?? {}).length > 0 && (
+                  <div className="space-y-1 mb-2">
+                    {Object.entries(mp.slotConditions ?? {}).map(([key, values]) => {
+                      const slotLabel = allSlotOptions.find((s) => s.key === key)?.label ?? key;
+                      return (
+                        <div key={key} className="flex items-center gap-2 bg-white rounded-lg px-2.5 py-1.5 border border-green-200">
+                          <span className="text-[10px] font-bold text-green-700 flex-shrink-0">{slotLabel}:</span>
+                          <span className="text-[10px] text-gray-600 flex-1">{values.join(', ')}</span>
+                          <button
+                            onClick={() => {
+                              const next = { ...(mp.slotConditions ?? {}) };
+                              delete next[key];
+                              updateMicroPresentation(mp.id, { slotConditions: Object.keys(next).length ? next : undefined });
+                            }}
+                            className="text-gray-300 hover:text-red-400 transition-colors flex-shrink-0"
+                          >
+                            <Trash2 size={11} />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Добавить условие */}
+                <div className="flex gap-1.5">
+                  <select
+                    className="text-[10px] border border-green-200 rounded-lg px-1.5 py-1 focus:outline-none focus:border-green-400 bg-white"
+                    value={condKey[mp.id] ?? ''}
+                    onChange={(e) => setCondKey((p) => ({ ...p, [mp.id]: e.target.value }))}
+                  >
+                    <option value="">Слот...</option>
+                    {allSlotOptions.map((s) => (
+                      <option key={s.key} value={s.key}>{s.label}</option>
+                    ))}
+                  </select>
+                  <input
+                    className="flex-1 text-[10px] border border-green-200 rounded-lg px-1.5 py-1 focus:outline-none focus:border-green-400 bg-white min-w-0"
+                    placeholder="акрил, пвх, дерево..."
+                    value={condValues[mp.id] ?? ''}
+                    onChange={(e) => setCondValues((p) => ({ ...p, [mp.id]: e.target.value }))}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const k = condKey[mp.id]; const v = condValues[mp.id];
+                        if (!k || !v?.trim()) return;
+                        const vals = v.split(',').map((x) => x.trim()).filter(Boolean);
+                        updateMicroPresentation(mp.id, {
+                          slotConditions: { ...(mp.slotConditions ?? {}), [k]: vals }
+                        });
+                        setCondKey((p) => ({ ...p, [mp.id]: '' }));
+                        setCondValues((p) => ({ ...p, [mp.id]: '' }));
+                      }
+                    }}
+                  />
+                  <button
+                    onClick={() => {
+                      const k = condKey[mp.id]; const v = condValues[mp.id];
+                      if (!k || !v?.trim()) return;
+                      const vals = v.split(',').map((x) => x.trim()).filter(Boolean);
+                      updateMicroPresentation(mp.id, {
+                        slotConditions: { ...(mp.slotConditions ?? {}), [k]: vals }
+                      });
+                      setCondKey((p) => ({ ...p, [mp.id]: '' }));
+                      setCondValues((p) => ({ ...p, [mp.id]: '' }));
+                    }}
+                    disabled={!condKey[mp.id] || !condValues[mp.id]?.trim()}
+                    className="text-[10px] px-2 py-1 bg-green-600 text-white rounded-lg font-bold disabled:opacity-40 hover:bg-green-700 transition-colors flex-shrink-0"
+                  >
+                    + Добавить
+                  </button>
+                </div>
+                <p className="text-[9px] text-green-500 mt-1">
+                  Введи значения через запятую. Совпадение частичное — «акрил» найдёт «акрил 10мм».
+                </p>
               </div>
 
               <div>

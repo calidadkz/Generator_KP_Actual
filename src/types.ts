@@ -127,12 +127,35 @@ export interface PdfTemplate {
 
 // ─── Sales Intelligence Platform ────────────────────────────────────────────
 
+// Один слот квалификации — вопрос который нужно выяснить у клиента
+export interface QualificationSlot {
+  key: string;    // уникальный идентификатор, напр. 'material'
+  label: string;  // текст вопроса/метки, напр. 'Материал'
+}
+
 export interface MachineType {
   id: string;
   name: string;
   description?: string;
-  qualifiers?: string[];
+  qualifiers?: QualificationSlot[];  // специфичные для этого типа станка
   siteUrl?: string;
+}
+
+// Сессия квалификации — данные одного звонка, сохраняемые в Firestore
+export interface QualificationSession {
+  id: string;
+  managerName: string;
+  clientPhone?: string;
+  machineTypeIds: string[];
+  focusMachineTypeId: string | null;
+  status: 'active' | 'paused' | 'done';
+  slots: Record<string, string>;
+  pendingSlots: string[];
+  currentStepId: string | null;
+  completedStepIds: string[];
+  completedMachineTypeIds: string[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface ScriptNode {
@@ -162,6 +185,9 @@ export interface MicroPresentation {
   isPublished?: boolean;  // false = AI-черновик, не отображается менеджеру
   createdBy?: 'human' | 'agent';
   sourceDialogueIds?: string[];
+  // Адаптивная фильтрация по заполненным слотам
+  // { material: ['акрил', 'пвх'] } — показать если слот material совпадает
+  slotConditions?: Record<string, string[]>;
 }
 
 export interface ClientPortrait {

@@ -44,18 +44,18 @@ const defaultCleaningConfig: CleaningConfig = {
 };
 
 const defaultMachineTypes: MachineType[] = [
-  { id: 'mt-01', name: 'Лазерный резчик CO2', description: 'Резка и гравировка неметаллов, акрил, дерево, ткань', qualifiers: ['Какой материал резать?', 'Нужна ли гравировка?'] },
-  { id: 'mt-02', name: 'Волоконный лазер', description: 'Резка металла: сталь, нержавейка, алюминий', qualifiers: ['Какой металл?', 'Толщина материала?'] },
-  { id: 'mt-03', name: 'ЧПУ фрезер по дереву', description: 'Фрезеровка, резьба, мебельное производство', qualifiers: ['Какой материал?', 'Размер рабочего поля?'] },
-  { id: 'mt-04', name: 'ЧПУ фрезер по металлу', description: 'Механообработка металлических деталей', qualifiers: ['Материал заготовки?', 'Точность обработки?'] },
-  { id: 'mt-05', name: 'Плазменный резчик', description: 'Резка металла большой толщины', qualifiers: ['Толщина металла?', 'Скорость резки важна?'] },
-  { id: 'mt-06', name: 'Лазерный гравер', description: 'Гравировка на сувенирах, металле, коже', qualifiers: ['Что гравировать?', 'Нужна цветная гравировка?'] },
-  { id: 'mt-07', name: 'Токарный станок ЧПУ', description: 'Обработка тел вращения', qualifiers: ['Диаметр деталей?', 'Материал?'] },
-  { id: 'mt-08', name: 'Листогиб ЧПУ', description: 'Гибка листового металла', qualifiers: ['Толщина листа?', 'Длина гибки?'] },
-  { id: 'mt-09', name: 'Пробивной станок ЧПУ', description: 'Пробивка отверстий в листовом металле', qualifiers: ['Толщина листа?', 'Серийность производства?'] },
-  { id: 'mt-10', name: 'Лазерный маркировщик', description: 'Маркировка деталей, QR-коды, серийные номера', qualifiers: ['Материал маркировки?', 'Скорость маркировки?'] },
-  { id: 'mt-11', name: 'Промышленный лазер', description: 'Сварка и резка в тяжёлой промышленности', qualifiers: ['Производственный объём?', 'Автоматизация нужна?'] },
-  { id: 'mt-12', name: 'Сварочный робот ЧПУ', description: 'Автоматизированная сварка деталей', qualifiers: ['Серийность производства?', 'Размер свариваемых деталей?'] },
+  { id: 'mt-01', name: 'Лазерный резчик CO2', description: 'Резка и гравировка неметаллов, акрил, дерево, ткань', qualifiers: [{ key: 'material', label: 'Материал' }, { key: 'thickness', label: 'Толщина' }, { key: 'work_area', label: 'Рабочее поле' }, { key: 'volume', label: 'Серийность' }] },
+  { id: 'mt-02', name: 'Волоконный лазер', description: 'Резка металла: сталь, нержавейка, алюминий', qualifiers: [{ key: 'metal_type', label: 'Тип металла' }, { key: 'thickness', label: 'Толщина' }, { key: 'work_area', label: 'Рабочее поле' }] },
+  { id: 'mt-03', name: 'ЧПУ фрезер по дереву', description: 'Фрезеровка, резьба, мебельное производство', qualifiers: [{ key: 'material', label: 'Материал' }, { key: 'work_area', label: 'Рабочее поле' }, { key: 'depth', label: 'Глубина фрезеровки' }] },
+  { id: 'mt-04', name: 'ЧПУ фрезер по металлу', description: 'Механообработка металлических деталей', qualifiers: [{ key: 'material', label: 'Материал заготовки' }, { key: 'precision', label: 'Точность обработки' }] },
+  { id: 'mt-05', name: 'Плазменный резчик', description: 'Резка металла большой толщины', qualifiers: [{ key: 'thickness', label: 'Толщина металла' }, { key: 'volume', label: 'Серийность' }] },
+  { id: 'mt-06', name: 'Лазерный гравер', description: 'Гравировка на сувенирах, металле, коже', qualifiers: [{ key: 'material', label: 'Материал' }, { key: 'color_engraving', label: 'Нужна цветная гравировка?' }] },
+  { id: 'mt-07', name: 'Токарный станок ЧПУ', description: 'Обработка тел вращения', qualifiers: [{ key: 'diameter', label: 'Диаметр деталей' }, { key: 'material', label: 'Материал' }] },
+  { id: 'mt-08', name: 'Листогиб ЧПУ', description: 'Гибка листового металла', qualifiers: [{ key: 'thickness', label: 'Толщина листа' }, { key: 'bend_length', label: 'Длина гибки' }] },
+  { id: 'mt-09', name: 'Пробивной станок ЧПУ', description: 'Пробивка отверстий в листовом металле', qualifiers: [{ key: 'thickness', label: 'Толщина листа' }, { key: 'volume', label: 'Серийность' }] },
+  { id: 'mt-10', name: 'Лазерный маркировщик', description: 'Маркировка деталей, QR-коды, серийные номера', qualifiers: [{ key: 'material', label: 'Материал маркировки' }, { key: 'speed', label: 'Скорость маркировки важна?' }] },
+  { id: 'mt-11', name: 'Промышленный лазер', description: 'Сварка и резка в тяжёлой промышленности', qualifiers: [{ key: 'volume', label: 'Производственный объём' }, { key: 'automation', label: 'Нужна автоматизация?' }] },
+  { id: 'mt-12', name: 'Сварочный робот ЧПУ', description: 'Автоматизированная сварка деталей', qualifiers: [{ key: 'volume', label: 'Серийность производства' }, { key: 'part_size', label: 'Размер деталей' }] },
 ];
 
 const defaultScriptNodes: ScriptNode[] = [
@@ -533,7 +533,7 @@ export const useSalesStore = create<SalesStore>()(
           s.fewShotExamples = [];
           s.cleaningConfig = defaultCleaningConfig;
         }
-        return s as SalesStore;
+        return s as unknown as SalesStore;
       },
     },
   ),

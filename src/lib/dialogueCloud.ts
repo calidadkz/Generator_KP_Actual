@@ -9,7 +9,7 @@ import {
   orderBy,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import { DialogueRecord, BatchInsights, ScriptNode, MicroPresentation, MachineType, Article, StyleDNA, CleaningConfig, FewShotExample, ClientPortrait, FeedbackNote } from '../types';
+import { DialogueRecord, BatchInsights, ScriptNode, MicroPresentation, MachineType, Article, StyleDNA, CleaningConfig, FewShotExample, ClientPortrait, FeedbackNote, QualificationSession } from '../types';
 
 const DIALOGUES_COLLECTION = 'processed_scripts';
 const BATCH_INSIGHTS_COLLECTION = 'batch_insights';
@@ -22,6 +22,7 @@ const CLEANING_CONFIG_COLLECTION = 'cleaning_config';
 const FEW_SHOT_EXAMPLES_COLLECTION = 'few_shot_examples';
 const CLIENT_PORTRAITS_COLLECTION = 'client_portraits';
 const FEEDBACK_NOTES_COLLECTION = 'feedback_notes';
+const QUAL_SESSIONS_COLLECTION = 'qualification_sessions';
 
 /**
  * Fetch all dialogues from Firestore at app startup
@@ -465,6 +466,56 @@ export async function deleteFeedbackNote(id: string): Promise<void> {
     await deleteDoc(docRef);
   } catch (error) {
     console.error('Failed to delete feedback note:', error);
+    throw error;
+  }
+}
+
+// ─── Qualification Sessions (Кокпит) ────────────────────────────────────────
+
+export async function createQualSession(session: QualificationSession): Promise<void> {
+  try {
+    const docRef = doc(db, QUAL_SESSIONS_COLLECTION, session.id);
+    await setDoc(docRef, session);
+  } catch (error) {
+    console.error('Failed to create qual session:', error);
+    throw error;
+  }
+}
+
+export async function updateQualSession(id: string, patch: Partial<QualificationSession>): Promise<void> {
+  try {
+    const docRef = doc(db, QUAL_SESSIONS_COLLECTION, id);
+    await updateDoc(docRef, patch);
+  } catch (error) {
+    console.error('Failed to update qual session:', error);
+    throw error;
+  }
+}
+
+export async function fetchQualSessions(managerName: string): Promise<QualificationSession[]> {
+  try {
+    const q = query(collection(db, QUAL_SESSIONS_COLLECTION), orderBy('updatedAt', 'desc'));
+    const snapshot = await getDocs(q);
+    const sessions: QualificationSession[] = [];
+    snapshot.forEach((docSnap) => {
+      const data = { id: docSnap.id, ...docSnap.data() } as QualificationSession;
+      if (data.managerName === managerName && data.status !== 'done') {
+        sessions.push(data);
+      }
+    });
+    return sessions.slice(0, 5);
+  } catch (error) {
+    console.error('Failed to fetch qual sessions:', error);
+    return [];
+  }
+}
+
+export async function deleteQualSession(id: string): Promise<void> {
+  try {
+    const docRef = doc(db, QUAL_SESSIONS_COLLECTION, id);
+    await deleteDoc(docRef);
+  } catch (error) {
+    console.error('Failed to delete qual session:', error);
     throw error;
   }
 }

@@ -1,6 +1,11 @@
 # 12. Статьи + StyleDNA + WordPress
 
-**Статус:** ✅ Реализован  
+**Статус:** ✅ ~85% | **Обновлено:** 2026-05-25
+**Реализовано:** 4-step wizard (тема → черновик → рестайл → публикация), StyleDNA, FewShot примеры, WordPress публикация
+**НЕ реализовано:** SEO-мета (title/description/keywords), автопланировщик публикаций, статистика читателей
+**Следующий шаг:** добавить SEO-поля при публикации в WordPress
+**Файлы:** `src/components/Sales/ArticleGenerationWizard.tsx`, `src/components/Sales/StyleDNAPanel.tsx`
+
 **Роли:** Руководитель  
 **Связи:** [[modules/06_knowledge_library]] [[modules/07_agent]]
 

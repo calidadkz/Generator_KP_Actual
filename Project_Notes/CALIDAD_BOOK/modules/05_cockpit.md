@@ -1,6 +1,11 @@
 # 05. Кокпит менеджера
 
-**Статус:** 🔧 В разработке (базовый функционал есть, расширения запланированы)  
+**Статус:** 🔧 ~80% | **Обновлено:** 2026-05-25
+**Реализовано:** навигация по скрипту, МП по категориям, мульти-станки, переходные МП, qualifiers в AdminMachineTypes
+**НЕ реализовано:** qualifiers в live-флоу во время звонка, ERP-конфигуратор, Битрикс24 интеграция, Шестерёнка
+**Следующий шаг:** добавить квалификационные вопросы (qualifiers) в ManagerCockpit — показывать во время живого звонка
+**Файл:** `src/components/Sales/ManagerCockpit.tsx`
+
 **Роли:** Менеджер  
 **Связи:** [[modules/06_knowledge_library]] [[modules/08_feedback_gear]] [[modules/13_erp_integration]] [[modules/14_bitrix24]] [[modules/16_closingscript]] [[modules/03_kp_generator]] [[04_process_flows]]
 

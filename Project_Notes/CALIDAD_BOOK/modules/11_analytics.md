@@ -1,6 +1,11 @@
 # 11. Аналитика и дашборд
 
-**Статус:** 💡 Запланирован  
+**Статус:** 💡 ~5% — есть данные, нет UI | **Обновлено:** 2026-05-25
+**Реализовано:** BatchInsights в Firestore (clientPortraits, topFormulations, scriptSuggestions, machineTypeBreakdown)
+**НЕ реализовано:** дашборд UI, воронка продаж, метрики менеджеров, графики, отчёты по периодам
+**Следующий шаг:** начать с дашборда на основе существующих BatchInsights из Firestore `batch_insights`
+**Файлы:** Firestore `batch_insights`, `src/store/useSalesStore.ts` (batchInsights)
+
 **Роли:** Руководитель (полная картина), Менеджер (личный кабинет)  
 **Связи:** [[modules/09_quality_control]] [[modules/10_trainer]] [[modules/15_client_portraits]] [[modules/07_agent]] [[modules/05_cockpit]] [[modules/14_bitrix24]]
 
