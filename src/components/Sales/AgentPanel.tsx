@@ -427,12 +427,26 @@ export const AgentPanel: React.FC = () => {
     let currentHistory = [...history];
 
     // Loop to auto-execute read tools
-    for (let i = 0; i < 5; i++) {
-      const res = await fetch('/api/agent-chat', {
+    for (let i = 0; i < 12; i++) {
+      let res = await fetch('/api/agent-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: currentHistory, stats, customInstructions: agentCustomInstructions }),
       });
+
+      // Auto-retry once on rate limit (429) after 65 seconds
+      if (res.status === 429) {
+        setDisplayMsgs((prev) => [
+          ...prev,
+          { id: uid(), type: 'tool_auto', toolName: 'rate_limit', summary: 'Лимит токенов API — ожидаем 65 сек и повторяем...' },
+        ]);
+        await new Promise((r) => setTimeout(r, 65000));
+        res = await fetch('/api/agent-chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messages: currentHistory, stats, customInstructions: agentCustomInstructions }),
+        });
+      }
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: res.statusText }));
