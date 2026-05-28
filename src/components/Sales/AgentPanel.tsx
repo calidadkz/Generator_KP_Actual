@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User, Loader2, CheckCircle, XCircle, AlertTriangle, Sparkles } from 'lucide-react';
 import { useSalesStore } from '../../store/useSalesStore';
-import { MicroPresentation } from '../../types';
+import { MicroPresentation, ScriptNode } from '../../types';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -28,7 +28,7 @@ type DisplayMsg =
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const READ_TOOLS = new Set(['get_micro_presentations', 'get_script_nodes', 'get_dialogues']);
+const READ_TOOLS = new Set(['get_micro_presentations', 'get_script_nodes', 'get_dialogues', 'get_dialogue_content', 'get_machine_types']);
 
 const TOOL_LABELS: Record<string, string> = {
   create_micro_presentation: 'Создать атом знаний',
@@ -36,14 +36,22 @@ const TOOL_LABELS: Record<string, string> = {
   get_micro_presentations: 'Поиск атомов знаний',
   get_script_nodes: 'Загрузка скрипта',
   get_dialogues: 'Загрузка диалогов',
+  get_dialogue_content: 'Чтение диалога',
+  get_machine_types: 'Типы станков',
+  create_script_node: 'Создать этап скрипта',
+  update_machine_type: 'Обновить слоты станка',
 };
 
 const TOOL_RISK: Record<string, 'green' | 'yellow' | 'red'> = {
   get_micro_presentations: 'green',
   get_script_nodes: 'green',
   get_dialogues: 'green',
+  get_dialogue_content: 'green',
+  get_machine_types: 'green',
   create_micro_presentation: 'yellow',
   update_micro_presentation: 'yellow',
+  create_script_node: 'yellow',
+  update_machine_type: 'yellow',
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -51,7 +59,7 @@ const TOOL_RISK: Record<string, 'green' | 'yellow' | 'red'> = {
 function describeToolCall(name: string, input: Record<string, unknown>): string {
   switch (name) {
     case 'create_micro_presentation':
-      return `Создать "${input.title}" [${input.category}]\nМетод: ${input.methodology}${input.technical ? `\nФакт: ${input.technical}` : ''}${input.compromise ? `\nКомпромисс: ${input.compromise}` : ''}`;
+      return `Создать "${input.title}" [${input.category}]\nМетод: ${input.methodology}${input.technical ? `\nФакт: ${input.technical}` : ''}${input.compromise ? `\nКомпромисс: ${input.compromise}` : ''}${input.machineTypeIds ? `\nСтанки: ${input.machineTypeIds}` : ''}`;
     case 'update_micro_presentation': {
       const fields = Object.entries(input)
         .filter(([k]) => k !== 'id')
@@ -59,6 +67,10 @@ function describeToolCall(name: string, input: Record<string, unknown>): string 
         .join('\n');
       return `Обновить МП ${input.id}\n${fields}`;
     }
+    case 'create_script_node':
+      return `Создать этап "${input.title}" [${input.category}]\n${input.content}${input.tips ? `\nСоветы: ${input.tips}` : ''}`;
+    case 'update_machine_type':
+      return `Обновить слоты станка ${input.id}\nСлоты: ${input.qualifiers}`;
     default:
       return `${name}(${JSON.stringify(input).slice(0, 100)})`;
   }
@@ -72,8 +84,9 @@ function uid(): string {
 
 export const AgentPanel: React.FC = () => {
   const {
-    microPresentations, scriptNodes, dialogues,
+    microPresentations, scriptNodes, dialogues, machineTypes,
     addMicroPresentation, updateMicroPresentation,
+    addScriptNode, updateMachineType,
   } = useSalesStore();
 
   const [displayMsgs, setDisplayMsgs] = useState<DisplayMsg[]>([]);
@@ -174,12 +187,82 @@ export const AgentPanel: React.FC = () => {
         const limit = Math.min(Number(input.limit || 10), 30);
         return JSON.stringify(
           dialogues.slice(0, limit).map((d) => ({
-            id: d.id, filename: d.filename, machineTypeIds: d.machineTypeIds,
-            analysisStatus: d.analysisStatus, dialogueType: d.dialogueType,
-            score: d.extractedData?.score,
-            keyInsights: d.extractedData?.conversationSteps?.map((s) => s.title),
+            id: d.id,
+            filename: d.filename,
+            machineTypeIds: d.machineTypeIds,
+            analysisStatus: d.analysisStatus,
+            dialogueType: d.dialogueType,
+            hasExtractedData: !!d.extractedData,
+            formulationsCount: d.extractedData?.formulations?.length ?? 0,
+            suggestedMPsCount: d.extractedData?.suggestedMicroPresentations?.length ?? 0,
+            stepsCount: d.extractedData?.conversationSteps?.length ?? 0,
           })),
         );
+      }
+
+      case 'get_dialogue_content': {
+        const id = String(input.id || '');
+        const dialogue = dialogues.find((d) => d.id === id);
+        if (!dialogue) return JSON.stringify({ error: `Диалог ${id} не найден` });
+        if (!dialogue.extractedData) return JSON.stringify({ error: `Диалог ${id} ещё не проанализирован (analysisStatus: ${dialogue.analysisStatus})` });
+        return JSON.stringify({
+          id: dialogue.id,
+          filename: dialogue.filename,
+          dialogueType: dialogue.dialogueType,
+          machineTypeIds: dialogue.machineTypeIds,
+          clientType: dialogue.extractedData.clientType,
+          machineTypeHint: dialogue.extractedData.machineTypeHint,
+          formulations: dialogue.extractedData.formulations,
+          techniques: dialogue.extractedData.techniques,
+          painPoints: dialogue.extractedData.painPoints ?? [],
+          conversationSteps: dialogue.extractedData.conversationSteps,
+          suggestedMicroPresentations: dialogue.extractedData.suggestedMicroPresentations,
+        });
+      }
+
+      case 'get_machine_types': {
+        return JSON.stringify(
+          machineTypes.map((mt) => ({
+            id: mt.id,
+            name: mt.name,
+            description: mt.description,
+            qualifiers: mt.qualifiers ?? [],
+          })),
+        );
+      }
+
+      case 'create_script_node': {
+        const node: ScriptNode = {
+          id: 'step-' + Date.now().toString(36),
+          order: scriptNodes.length + 1,
+          title: String(input.title || ''),
+          content: String(input.content || ''),
+          category: String(input.category || 'Общее'),
+          tips: input.tips
+            ? String(input.tips).split('|').map((s) => s.trim()).filter(Boolean)
+            : [],
+        };
+        addScriptNode(node);
+        return JSON.stringify({ success: true, id: node.id, message: `Создан этап "${node.title}" (${node.id})` });
+      }
+
+      case 'update_machine_type': {
+        const id = String(input.id || '');
+        const mt = machineTypes.find((m) => m.id === id);
+        if (!mt) return JSON.stringify({ error: `Тип станка ${id} не найден` });
+        const qualifiers = input.qualifiers
+          ? String(input.qualifiers)
+              .split('|')
+              .map((s) => s.trim())
+              .filter(Boolean)
+              .map((pair) => {
+                const colonIdx = pair.indexOf(':');
+                if (colonIdx === -1) return { key: pair.toLowerCase().replace(/\s+/g, '_'), label: pair };
+                return { key: pair.slice(0, colonIdx).trim(), label: pair.slice(colonIdx + 1).trim() };
+              })
+          : [];
+        updateMachineType(id, { qualifiers });
+        return JSON.stringify({ success: true, message: `Станок "${mt.name}" обновлён: ${qualifiers.length} слотов` });
       }
 
       default:
@@ -414,10 +497,10 @@ export const AgentPanel: React.FC = () => {
             <div className="text-xs space-y-1 max-w-xs mx-auto text-left bg-gray-50 rounded-xl p-3">
               <p className="font-semibold text-gray-500 mb-2">Примеры:</p>
               {[
-                'Покажи все атомы про возражения',
-                'Найди похожие МП про чиллер',
-                'Создай атом знаний про гарантию трубки',
-                'Что в скрипте есть на тему квалификации?',
+                'Покажи диалоги готовые к анализу',
+                'Создай атомы знаний из первого диалога',
+                'Создай этапы скрипта из диалогов',
+                'Добавь квалификационные слоты для лазера',
               ].map((ex) => (
                 <button
                   key={ex}
