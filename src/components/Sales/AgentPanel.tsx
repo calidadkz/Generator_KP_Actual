@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Loader2, CheckCircle, XCircle, AlertTriangle, Sparkles, Trash2 } from 'lucide-react';
+import { Send, Bot, User, Loader2, CheckCircle, XCircle, AlertTriangle, Sparkles, Trash2, Settings, Eye, EyeOff } from 'lucide-react';
 import { useSalesStore } from '../../store/useSalesStore';
+import { AGENT_SYSTEM_PROMPT_BASE } from '../../lib/agentPromptBase';
 import { MicroPresentation, ScriptNode } from '../../types';
 import { logApiUsage } from '../../lib/apiUsageLog';
 import { analyzeDialogue, extractArticlePatterns } from '../../services/dialogueProcessor';
@@ -128,7 +129,12 @@ export const AgentPanel: React.FC = () => {
     addMicroPresentation, updateMicroPresentation, deleteMicroPresentation,
     addScriptNode, updateScriptNode, updateMachineType,
     updateDialogue,
+    agentCustomInstructions, setAgentCustomInstructions,
   } = useSalesStore();
+
+  const [showInstructions, setShowInstructions] = useState(false);
+  const [showBasePrompt, setShowBasePrompt] = useState(false);
+  const [instructionsDraft, setInstructionsDraft] = useState(agentCustomInstructions);
 
   const saved = loadChatHistory();
   const [displayMsgs, setDisplayMsgs] = useState<DisplayMsg[]>(saved.displayMsgs);
@@ -425,7 +431,7 @@ export const AgentPanel: React.FC = () => {
       const res = await fetch('/api/agent-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: currentHistory, stats }),
+        body: JSON.stringify({ messages: currentHistory, stats, customInstructions: agentCustomInstructions }),
       });
 
       if (!res.ok) {
@@ -643,6 +649,61 @@ export const AgentPanel: React.FC = () => {
           >
             <Trash2 size={14} />
           </button>
+        )}
+      </div>
+
+      {/* Custom instructions panel */}
+      <div className="mb-3 rounded-xl border border-gray-200 overflow-hidden">
+        <button
+          onClick={() => setShowInstructions((p) => !p)}
+          className="w-full flex items-center gap-2 px-3 py-2 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
+        >
+          <Settings size={12} className="text-gray-400 flex-shrink-0" />
+          <span className="text-xs font-bold text-gray-500 flex-1">Инструкции агента</span>
+          {agentCustomInstructions.trim() && (
+            <span className="text-[10px] bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded font-bold">активны</span>
+          )}
+          {showInstructions ? <EyeOff size={11} className="text-gray-400" /> : <Eye size={11} className="text-gray-400" />}
+        </button>
+        {showInstructions && (
+          <div className="px-3 pb-3 pt-2 bg-white space-y-2">
+            <p className="text-[10px] text-gray-400">
+              Дополнительные инструкции добавляются к базовому промпту и влияют на поведение агента.
+              Базовый промпт обновляется автоматически при деплое.
+            </p>
+            <textarea
+              value={instructionsDraft}
+              onChange={(e) => setInstructionsDraft(e.target.value)}
+              placeholder="Например: Всегда уточняй тип станка прежде чем создавать атом. Не создавай более 3 атомов за раз без подтверждения."
+              className="w-full text-xs border border-gray-200 rounded-lg p-2 resize-none focus:outline-none focus:border-calidad-blue"
+              rows={4}
+            />
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                onClick={() => { setAgentCustomInstructions(instructionsDraft); setShowInstructions(false); }}
+                className="px-3 py-1 bg-calidad-blue text-white rounded-lg text-xs font-bold hover:bg-blue-800 transition-colors"
+              >
+                Сохранить
+              </button>
+              <button
+                onClick={() => { setInstructionsDraft(''); setAgentCustomInstructions(''); }}
+                className="px-3 py-1 bg-gray-100 text-gray-500 rounded-lg text-xs font-bold hover:bg-gray-200 transition-colors"
+              >
+                Сбросить
+              </button>
+              <button
+                onClick={() => setShowBasePrompt((p) => !p)}
+                className="px-3 py-1 bg-gray-100 text-gray-500 rounded-lg text-xs font-bold hover:bg-gray-200 transition-colors ml-auto"
+              >
+                {showBasePrompt ? 'Скрыть базовый промпт' : 'Просмотр базового промпта'}
+              </button>
+            </div>
+            {showBasePrompt && (
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-2 max-h-48 overflow-y-auto">
+                <pre className="text-[10px] text-gray-600 whitespace-pre-wrap font-mono leading-relaxed">{AGENT_SYSTEM_PROMPT_BASE}</pre>
+              </div>
+            )}
+          </div>
         )}
       </div>
 

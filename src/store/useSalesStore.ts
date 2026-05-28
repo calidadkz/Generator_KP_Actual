@@ -283,6 +283,10 @@ interface SalesStore {
   updateFeedbackNote: (id: string, patch: Partial<FeedbackNote>) => void;
   deleteFeedbackNote: (id: string) => void;
 
+  // Agent custom instructions
+  agentCustomInstructions: string;
+  setAgentCustomInstructions: (s: string) => void;
+
   migrateOldDialogues: () => Promise<void>;
 }
 
@@ -300,6 +304,7 @@ export const useSalesStore = create<SalesStore>()(
       cleaningConfig: defaultCleaningConfig,
       clientPortraits: [],
       feedbackNotes: [],
+      agentCustomInstructions: '',
 
       addMachineType: (t) =>
         set((s) => {
@@ -484,6 +489,8 @@ export const useSalesStore = create<SalesStore>()(
         set((s) => ({ feedbackNotes: s.feedbackNotes.filter((n) => n.id !== id) }));
         deleteNoteFromCloud(id).catch(console.error);
       },
+
+      setAgentCustomInstructions: (s) => set({ agentCustomInstructions: s }),
 
       migrateOldDialogues: async () => {
         const dialogues = get().dialogues;

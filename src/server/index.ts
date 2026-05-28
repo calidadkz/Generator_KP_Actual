@@ -327,12 +327,12 @@ app.post('/api/wp-update/:postId', async (req: Request, res: Response) => {
 
 app.post('/api/agent-chat', async (req: Request, res: Response) => {
   try {
-    const { messages, stats } = req.body;
+    const { messages, stats, customInstructions } = req.body;
     if (!Array.isArray(messages)) {
       return res.status(400).json({ error: 'messages array is required' });
     }
     const dbStats = stats ?? { mpCount: 0, publishedCount: 0, draftCount: 0, scriptCount: 0, dialogueCount: 0 };
-    const result = await agentChat(messages, dbStats, getAnthropicKey());
+    const result = await agentChat(messages, dbStats, getAnthropicKey(), customInstructions ?? '');
     res.json(result);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

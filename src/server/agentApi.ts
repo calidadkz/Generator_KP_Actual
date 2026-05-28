@@ -349,12 +349,18 @@ export async function agentChat(
   messages: AgentApiMessage[],
   stats: { mpCount: number; publishedCount: number; draftCount: number; scriptCount: number; dialogueCount: number },
   apiKey: string,
+  customInstructions?: string,
 ): Promise<AgentChatResult> {
   const anthropicMessages = convertMessages(messages);
 
   if (anthropicMessages.length === 0) {
     return { type: 'text', content: 'Нет сообщений для обработки.' };
   }
+
+  const basePrompt = buildSystemPrompt(stats);
+  const systemPrompt = customInstructions?.trim()
+    ? `${basePrompt}\n\n---\nДОПОЛНИТЕЛЬНЫЕ ИНСТРУКЦИИ ОТ РУКОВОДИТЕЛЯ:\n${customInstructions.trim()}`
+    : basePrompt;
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -366,7 +372,7 @@ export async function agentChat(
     body: JSON.stringify({
       model: 'claude-sonnet-4-6',
       max_tokens: 4096,
-      system: buildSystemPrompt(stats),
+      system: systemPrompt,
       messages: anthropicMessages,
       tools: AGENT_TOOLS,
     }),

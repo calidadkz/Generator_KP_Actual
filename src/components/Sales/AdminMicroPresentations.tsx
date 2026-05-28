@@ -113,138 +113,103 @@ export const AdminMicroPresentations: React.FC = () => {
         </button>
       </div>
 
-      {/* Filters row */}
-      <div className="flex flex-wrap gap-1.5 mb-1">
-        <button
-          onClick={() => setFilterCategory('')}
-          className={`px-2.5 py-1 rounded-full text-xs font-bold transition-colors ${
-            filterCategory === '' ? 'bg-calidad-blue text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-          }`}
+      {/* Filters — compact single row */}
+      <div className="flex items-center gap-2 flex-wrap mb-2">
+        <select
+          value={filterCategory}
+          onChange={(e) => setFilterCategory(e.target.value)}
+          className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-calidad-blue bg-white text-gray-600 font-semibold"
         >
-          Все категории
-        </button>
-        {CATEGORIES.map((cat) => (
-          <button
-            key={cat}
-            onClick={() => setFilterCategory(cat === filterCategory ? '' : cat)}
-            className={`px-2.5 py-1 rounded-full text-xs font-bold transition-colors ${
-              filterCategory === cat
-                ? 'bg-calidad-blue text-white'
-                : (CATEGORY_COLORS[cat] ?? 'bg-gray-100 text-gray-500') + ' hover:opacity-80'
-            }`}
-          >
-            {cat}
-          </button>
-        ))}
+          <option value="">Все категории</option>
+          {CATEGORIES.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
+        </select>
+        <select
+          value={filterPublished}
+          onChange={(e) => setFilterPublished(e.target.value as 'all' | 'published' | 'drafts')}
+          className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-calidad-blue bg-white text-gray-600 font-semibold"
+        >
+          <option value="all">Все статусы</option>
+          <option value="published">Опубликованные</option>
+          <option value="drafts">Черновики AI</option>
+        </select>
+        <select
+          value={filterMachineTypeId}
+          onChange={(e) => setFilterMachineTypeId(e.target.value)}
+          className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-calidad-blue bg-white text-gray-600 font-semibold"
+        >
+          <option value="">Все типы станков</option>
+          {machineTypes.map((mt) => <option key={mt.id} value={mt.id}>{mt.name}</option>)}
+        </select>
       </div>
 
-      <div className="flex flex-wrap gap-1.5 mb-1">
-        {(['all', 'published', 'drafts'] as const).map((f) => (
-          <button
-            key={f}
-            onClick={() => setFilterPublished(f)}
-            className={`px-2.5 py-1 rounded-full text-xs font-bold transition-colors ${
-              filterPublished === f ? 'bg-amber-500 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-            }`}
-          >
-            {f === 'all' ? 'Все статусы' : f === 'published' ? '✅ Опубликованные' : '⚠️ Черновики AI'}
-          </button>
-        ))}
-      </div>
-
-      <div className="flex flex-wrap gap-1.5 mb-2">
-        <button
-          onClick={() => setFilterMachineTypeId('')}
-          className={`px-2.5 py-1 rounded-full text-xs font-bold transition-colors ${
-            filterMachineTypeId === '' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-          }`}
-        >
-          Все типы
-        </button>
-        {machineTypes.map((mt) => (
-          <button
-            key={mt.id}
-            onClick={() => setFilterMachineTypeId(mt.id === filterMachineTypeId ? '' : mt.id)}
-            className={`px-2.5 py-1 rounded-full text-xs font-bold transition-colors ${
-              filterMachineTypeId === mt.id
-                ? 'bg-indigo-600 text-white'
-                : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-            }`}
-          >
-            {mt.name}
-          </button>
-        ))}
-      </div>
-
-      {filtered.map((mp) => (
-        <div
-          key={mp.id}
-          className={`bg-white rounded-xl border overflow-hidden ${
-            mp.isPublished === false ? 'border-amber-300' : 'border-gray-200'
-          }`}
-        >
-          <div
-            className="flex items-start gap-3 p-4 cursor-pointer hover:bg-gray-50"
-            onClick={() => toggle(mp.id)}
-          >
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1 flex-wrap">
-                <span
-                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${
-                    CATEGORY_COLORS[mp.category] ?? 'bg-gray-100 text-gray-600'
-                  }`}
-                >
-                  {mp.category}
-                </span>
-                {mp.isPublished === false && (
-                  <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 flex-shrink-0">
-                    <AlertTriangle size={10} /> AI-черновик
-                  </span>
-                )}
-                {mp.technical && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">🔘 факт</span>
-                )}
-                {(mp.methodology || (!mp.methodology && mp.content)) && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-500">💬 метод</span>
-                )}
-                {mp.compromise && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-500">💰 компромисс</span>
-                )}
+      {/* Grouped by category when no specific category filter active */}
+      {(filterCategory ? [filterCategory] : CATEGORIES).map((cat) => {
+        const group = filtered.filter((mp) => mp.category === cat);
+        if (group.length === 0) return null;
+        return (
+          <div key={cat}>
+            {!filterCategory && (
+              <div className={`flex items-center gap-2 px-2 py-1 rounded-lg mb-1 ${CATEGORY_COLORS[cat] ?? 'bg-gray-100 text-gray-600'}`}>
+                <span className="text-[10px] font-black uppercase tracking-widest flex-1">{cat}</span>
+                <span className="text-[10px] font-bold opacity-60">{group.length}</span>
               </div>
-              <input
-                className="w-full text-sm font-semibold text-gray-800 bg-transparent outline-none"
-                value={mp.title}
-                onChange={(e) => updateMicroPresentation(mp.id, { title: e.target.value })}
-                onClick={(e) => e.stopPropagation()}
-                placeholder="Название атома знаний"
-              />
-              {!expanded[mp.id] && (
-                <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{getPreviewText(mp)}</p>
-              )}
-            </div>
-            <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-              {mp.isPublished === false ? (
-                <button
-                  onClick={() => updateMicroPresentation(mp.id, { isPublished: true })}
-                  className="flex items-center gap-1 px-2 py-1 text-xs font-bold text-amber-700 bg-amber-100 rounded-lg hover:bg-amber-200 transition-colors"
-                  title="Опубликовать"
-                >
-                  <CheckCircle size={12} /> Опубликовать
-                </button>
-              ) : null}
-              <button
-                onClick={() => deleteMicroPresentation(mp.id)}
-                className="p-1.5 text-gray-300 hover:text-red-500 transition-colors"
+            )}
+            {group.map((mp) => (
+              <div
+                key={mp.id}
+                className={`bg-white rounded-xl border overflow-hidden mb-2 ${mp.isPublished === false ? 'border-amber-300' : 'border-gray-200'}`}
               >
-                <Trash2 size={14} />
-              </button>
-              {expanded[mp.id] ? (
-                <ChevronUp size={14} className="text-gray-400" />
-              ) : (
-                <ChevronDown size={14} className="text-gray-400" />
-              )}
-            </div>
-          </div>
+                <div
+                  className="flex items-start gap-3 p-4 cursor-pointer hover:bg-gray-50"
+                  onClick={() => toggle(mp.id)}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      {filterCategory && (
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${CATEGORY_COLORS[mp.category] ?? 'bg-gray-100 text-gray-600'}`}>
+                          {mp.category}
+                        </span>
+                      )}
+                      {mp.isPublished === false && (
+                        <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 flex-shrink-0">
+                          <AlertTriangle size={10} /> AI-черновик
+                        </span>
+                      )}
+                    </div>
+                    <input
+                      className="w-full text-sm font-semibold text-gray-800 bg-transparent outline-none"
+                      value={mp.title}
+                      onChange={(e) => updateMicroPresentation(mp.id, { title: e.target.value })}
+                      onClick={(e) => e.stopPropagation()}
+                      placeholder="Название атома знаний"
+                    />
+                    {!expanded[mp.id] && (
+                      <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{getPreviewText(mp)}</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                    {mp.isPublished === false ? (
+                      <button
+                        onClick={() => updateMicroPresentation(mp.id, { isPublished: true })}
+                        className="flex items-center gap-1 px-2 py-1 text-xs font-bold text-amber-700 bg-amber-100 rounded-lg hover:bg-amber-200 transition-colors"
+                        title="Опубликовать"
+                      >
+                        <CheckCircle size={12} /> Опубликовать
+                      </button>
+                    ) : null}
+                    <button
+                      onClick={() => deleteMicroPresentation(mp.id)}
+                      className="p-1.5 text-gray-300 hover:text-red-500 transition-colors"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                    {expanded[mp.id] ? (
+                      <ChevronUp size={14} className="text-gray-400" />
+                    ) : (
+                      <ChevronDown size={14} className="text-gray-400" />
+                    )}
+                  </div>
+                </div>
 
           {expanded[mp.id] && (
             <div className="px-4 pb-4 space-y-4 border-t border-gray-100">
@@ -445,9 +410,12 @@ export const AdminMicroPresentations: React.FC = () => {
                 />
               </div>
             </div>
-          )}
-        </div>
-      ))}
+              )}
+            </div>
+          ))}
+          </div>
+        );
+      })}
 
       {filtered.length === 0 && (
         <div className="text-center py-12 text-gray-400">

@@ -14,7 +14,6 @@ import {
   extractArticlePatterns,
   listAvailableModels,
   classifyDialogueType,
-  preprocessDialogueText,
 } from '../../services/dialogueProcessor';
 import { CleaningConfigEditor } from './CleaningConfigEditor';
 import {
@@ -295,6 +294,31 @@ function BatchInsightCard({
   );
 }
 
+// ─── Dialogue text renderer (speaker labels) ─────────────────────────────────
+
+const MANAGER_RE = /^(Менеджер|М|Manager|Оператор|Продавец|Специалист)\s*[:—]/i;
+const CLIENT_RE  = /^(Клиент|К|Client|Покупатель|Заказчик|Потенциальный клиент)\s*[:—]/i;
+
+function renderDialogueText(text: string): React.ReactNode {
+  const lines = text.split('\n');
+  return lines.map((line, i) => {
+    if (!line.trim()) return <div key={i} className="h-1" />;
+    if (MANAGER_RE.test(line))
+      return (
+        <div key={i} className="bg-blue-50 border-l-2 border-blue-400 px-2 py-1 my-0.5 rounded-r text-xs text-blue-900 leading-relaxed">
+          {line}
+        </div>
+      );
+    if (CLIENT_RE.test(line))
+      return (
+        <div key={i} className="bg-gray-50 border-l-2 border-gray-300 px-2 py-1 my-0.5 rounded-r text-xs text-gray-700 leading-relaxed">
+          {line}
+        </div>
+      );
+    return <div key={i} className="text-xs text-gray-500 pl-2 leading-relaxed">{line}</div>;
+  });
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export const AdminDialogues: React.FC = () => {
@@ -312,7 +336,13 @@ export const AdminDialogues: React.FC = () => {
 
   const fileRef = useRef<HTMLInputElement>(null);
   const [expandedClean, setExpandedClean] = useState<Record<string, boolean>>({});
-  const [expandedAnalysis, setExpandedAnalysis] = useState<Record<string, boolean>>({});
+  const [expandedAnalysis, setExpandedAnalysis] = useState<Record<string, boolean>>(
+    () => Object.fromEntries(
+      useSalesStore.getState().dialogues
+        .filter((d) => d.analysisStatus === 'done')
+        .map((d) => [d.id, true]),
+    ),
+  );
   const [loadedTexts, setLoadedTexts] = useState<Record<string, { raw: string; cleaned: string }>>({});
   const [dragOver, setDragOver] = useState(false);
   const [availableGeminiModels, setAvailableGeminiModels] = useState<string[] | null>(null);
@@ -614,24 +644,46 @@ export const AdminDialogues: React.FC = () => {
   };
 
   const [acceptedKeys, setAcceptedKeys] = useState<Set<string>>(new Set());
+  const [mpLinkPicker, setMpLinkPicker] = useState<string | null>(null);
 
-  const handleAddPresentation = (d: DialogueRecord, idx: number) => {
+  useEffect(() => {
+    if (!mpLinkPicker) return;
+    const close = () => setMpLinkPicker(null);
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [mpLinkPicker]);
+
+  const handleAddPresentation = (d: DialogueRecord, idx: number, linkToNodeId?: string) => {
     if (!d.extractedData) return;
     const key = `${d.id}-${idx}`;
     const src = d.extractedData.suggestedMicroPresentations[idx];
     const isDup = microPresentations.some((mp) => mp.content.trim() === src.content.trim());
     if (isDup) { flashDup(key); return; }
+    const mpId = 'mp-' + Date.now().toString(36) + idx;
     const mp: MicroPresentation = {
       ...src,
-      id: 'mp-' + Date.now().toString(36) + idx,
+      id: mpId,
       machineTypeIds: src.machineTypeIds ?? [],
       tags: src.tags ?? [],
     };
     addMicroPresentation(mp);
+    if (linkToNodeId) {
+      const node = scriptNodes.find((n) => n.id === linkToNodeId);
+      if (node) updateScriptNode(linkToNodeId, { microPresentationIds: [...(node.microPresentationIds ?? []), mpId] });
+    }
     setAcceptedKeys((prev) => new Set([...prev, key]));
     setTimeout(() => {
       setAcceptedKeys((prev) => { const n = new Set(prev); n.delete(key); return n; });
     }, 2000);
+    setMpLinkPicker(null);
+  };
+
+  const handleAcceptAllPresentations = (d: DialogueRecord) => {
+    if (!d.extractedData) return;
+    (d.extractedData.suggestedMicroPresentations ?? []).forEach((_, i) => {
+      const key = `${d.id}-${i}`;
+      if (!acceptedKeys.has(key) && !dupFlashKeys.has(key)) handleAddPresentation(d, i);
+    });
   };
 
   const handleAddFormulation = (text: string) => {
@@ -851,7 +903,7 @@ export const AdminDialogues: React.FC = () => {
                 {d.machineTypeHint && ` · ${d.machineTypeHint}`}
               </p>
               {d.clientType && (
-                <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{d.clientType}</p>
+                <p className="text-xs text-gray-500 mt-0.5 line-clamp-3">{d.clientType}</p>
               )}
             </div>
 
@@ -1070,9 +1122,9 @@ export const AdminDialogues: React.FC = () => {
                           <Loader size={11} className="animate-spin" /> Загрузка...
                         </div>
                       ) : (
-                        <p className="text-xs text-gray-600 whitespace-pre-wrap leading-relaxed">
-                          {loadedTexts[d.id].cleaned || loadedTexts[d.id].raw}
-                        </p>
+                        <div className="space-y-0">
+                          {renderDialogueText(loadedTexts[d.id].cleaned || loadedTexts[d.id].raw)}
+                        </div>
                       )}
                     </div>
                   </div>
@@ -1087,8 +1139,20 @@ export const AdminDialogues: React.FC = () => {
                   onClick={() => setExpandedAnalysis((p) => ({ ...p, [d.id]: !p[d.id] }))}
                   className="w-full flex items-center justify-between px-4 py-2.5 text-xs text-gray-500 hover:bg-gray-50 transition-colors border-t border-gray-100"
                 >
-                  <span className="font-semibold flex items-center gap-1.5">
-                    <CheckCircle size={11} /> Результаты анализа
+                  <span className="font-semibold flex items-center gap-1.5 flex-wrap">
+                    <CheckCircle size={11} className="text-emerald-500" /> Результаты анализа
+                    {(d.extractedData.conversationSteps?.length ?? 0) > 0 && (
+                      <span className="px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded text-[10px] font-bold">{d.extractedData.conversationSteps!.length} этапов</span>
+                    )}
+                    {(d.extractedData.formulations?.length ?? 0) > 0 && (
+                      <span className="px-1.5 py-0.5 bg-yellow-100 text-yellow-700 rounded text-[10px] font-bold">{d.extractedData.formulations!.length} формулировок</span>
+                    )}
+                    {(d.extractedData.suggestedMicroPresentations?.length ?? 0) > 0 && (
+                      <span className="px-1.5 py-0.5 bg-green-100 text-green-700 rounded text-[10px] font-bold">{d.extractedData.suggestedMicroPresentations!.length} МП</span>
+                    )}
+                    {(d.extractedData.techniques?.length ?? 0) > 0 && (
+                      <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded text-[10px] font-bold">{d.extractedData.techniques!.length} техник</span>
+                    )}
                   </span>
                   {expandedAnalysis[d.id] ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                 </button>
@@ -1107,10 +1171,10 @@ export const AdminDialogues: React.FC = () => {
 
                     {(d.extractedData.conversationSteps?.length ?? 0) > 0 && (
                       <div className="px-4 py-3">
-                        <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center justify-between mb-1">
                           <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Этапы разговора</p>
-                          <span className="text-[10px] text-gray-400">→ можно добавить в шаблон скрипта</span>
                         </div>
+                        <p className="text-[10px] text-gray-400 mb-2">Нажми «В шаблон» → выбери существующий этап или создай новый в разделе <span className="font-bold">Скрипт</span></p>
                         <div className="space-y-2">
                           {(d.extractedData.conversationSteps ?? []).map((step, i) => {
                             const pickerKey = `${d.id}-step-${i}`;
@@ -1197,13 +1261,34 @@ export const AdminDialogues: React.FC = () => {
 
                     {(d.extractedData.formulations?.length ?? 0) > 0 && (
                       <div className="px-4 py-3">
-                        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Удачные формулировки</p>
-                        <ul className="space-y-1">
-                          {(d.extractedData.formulations ?? []).map((f, i) => (
-                            <li key={i} className="text-xs text-gray-600 flex items-start gap-1.5">
-                              <span className="text-calidad-blue mt-0.5 flex-shrink-0">›</span> {f}
-                            </li>
-                          ))}
+                        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Удачные формулировки</p>
+                        <p className="text-[10px] text-gray-400 mb-2">Нажми «+» чтобы сохранить как Атом знаний категории <span className="font-bold">Формулировки</span></p>
+                        <ul className="space-y-1.5">
+                          {(d.extractedData.formulations ?? []).map((f, i) => {
+                            const fkey = `${d.id}-form-${i}`;
+                            const fDone = acceptedKeys.has(fkey);
+                            const fDup = dupFlashKeys.has(fkey);
+                            return (
+                              <li key={i} className="flex items-start gap-2">
+                                <span className="text-calidad-blue mt-0.5 flex-shrink-0">›</span>
+                                <span className="text-xs text-gray-600 flex-1 leading-relaxed">{f}</span>
+                                <button
+                                  onClick={() => {
+                                    if (fDone || fDup) return;
+                                    const isDup = microPresentations.some((mp) => mp.content.trim() === f.trim());
+                                    if (isDup) { flashDup(fkey); return; }
+                                    handleAddFormulation(f);
+                                    setAcceptedKeys((prev) => new Set([...prev, fkey]));
+                                    setTimeout(() => setAcceptedKeys((prev) => { const n = new Set(prev); n.delete(fkey); return n; }), 2000);
+                                  }}
+                                  className={`flex-shrink-0 flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold transition-all ${fDup ? 'bg-amber-400 text-white' : fDone ? 'bg-emerald-500 text-white' : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200 border border-yellow-300'}`}
+                                  title="Сохранить как атом знаний"
+                                >
+                                  {fDup ? <XCircle size={9} /> : fDone ? <CheckCircle size={9} /> : <Plus size={9} />}
+                                </button>
+                              </li>
+                            );
+                          })}
                         </ul>
                       </div>
                     )}
@@ -1221,12 +1306,22 @@ export const AdminDialogues: React.FC = () => {
 
                     {(d.extractedData.suggestedMicroPresentations?.length ?? 0) > 0 && (
                       <div className="px-4 py-3">
-                        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Предложенные мини-презентации</p>
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Предложенные мини-презентации</p>
+                          <button
+                            onClick={() => handleAcceptAllPresentations(d)}
+                            className="flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 hover:bg-green-200 rounded text-[10px] font-bold border border-green-200 transition-colors"
+                          >
+                            <CheckCircle size={9} /> Принять все
+                          </button>
+                        </div>
                         <div className="space-y-2">
                           {(d.extractedData.suggestedMicroPresentations ?? []).map((mp, i) => {
                             const key = `${d.id}-${i}`;
                             const done = acceptedKeys.has(key);
                             const isDup = dupFlashKeys.has(key);
+                            const pickerKey = `mp-link-${d.id}-${i}`;
+                            const isPickerOpen = mpLinkPicker === pickerKey;
                             return (
                               <div key={i} className="flex items-start gap-2 bg-gray-50 rounded-lg p-3">
                                 <div className="flex-1 min-w-0">
@@ -1234,24 +1329,54 @@ export const AdminDialogues: React.FC = () => {
                                   <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{mp.content}</p>
                                   <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full font-bold mt-1 inline-block">{mp.category}</span>
                                 </div>
-                                <button
-                                  onClick={() => !done && !isDup && handleAddPresentation(d, i)}
-                                  className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold transition-all duration-300 flex-shrink-0 ${
-                                    isDup
-                                      ? 'bg-amber-400 text-white cursor-default'
-                                      : done
-                                      ? 'bg-emerald-500 text-white scale-105'
-                                      : 'bg-green-600 text-white hover:bg-green-700'
-                                  }`}
-                                >
+                                <div className="relative flex-shrink-0" onMouseDown={(e) => e.stopPropagation()}>
                                   {isDup ? (
-                                    <><XCircle size={10} /> Уже есть</>
+                                    <span className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold bg-amber-400 text-white">
+                                      <XCircle size={10} /> Уже есть
+                                    </span>
                                   ) : done ? (
-                                    <><CheckCircle size={10} /> Принято</>
+                                    <span className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold bg-emerald-500 text-white">
+                                      <CheckCircle size={10} /> Принято
+                                    </span>
                                   ) : (
-                                    <><Plus size={10} /> Принять</>
+                                    <div className="flex items-center">
+                                      <button
+                                        onMouseDown={() => handleAddPresentation(d, i)}
+                                        className="flex items-center gap-1 px-2 py-1 rounded-l-md text-xs font-bold bg-green-600 text-white hover:bg-green-700 transition-colors"
+                                      >
+                                        <Plus size={10} /> Принять
+                                      </button>
+                                      <button
+                                        onMouseDown={() => setMpLinkPicker(isPickerOpen ? null : pickerKey)}
+                                        className="flex items-center px-1.5 py-1 rounded-r-md text-xs font-bold bg-green-700 text-white hover:bg-green-800 transition-colors border-l border-green-500"
+                                        title="Принять и прилинковать к этапу скрипта"
+                                      >
+                                        <ChevronDown size={9} />
+                                      </button>
+                                    </div>
                                   )}
-                                </button>
+                                  {isPickerOpen && (
+                                    <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-50 w-56 py-1.5 max-h-64 overflow-y-auto">
+                                      <p className="px-3 pt-1 pb-0.5 text-[10px] text-gray-400 uppercase tracking-wider font-bold">Принять и добавить в этап →</p>
+                                      <button
+                                        onMouseDown={() => handleAddPresentation(d, i)}
+                                        className="w-full text-left px-3 py-2 text-xs text-gray-500 hover:bg-gray-50 italic"
+                                      >
+                                        Без привязки
+                                      </button>
+                                      {[...scriptNodes].sort((a, b) => a.order - b.order).map((node) => (
+                                        <button
+                                          key={node.id}
+                                          onMouseDown={() => handleAddPresentation(d, i, node.id)}
+                                          className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-blue-50 flex items-center gap-2"
+                                        >
+                                          <span className="w-4 h-4 rounded-full bg-calidad-blue text-white text-[9px] font-black flex items-center justify-center flex-shrink-0">{node.order}</span>
+                                          <span className="truncate">{node.title}</span>
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             );
                           })}
