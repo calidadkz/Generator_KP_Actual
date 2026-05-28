@@ -56,8 +56,10 @@ function getAnthropicKey(): string {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) {
     console.warn('[server] ANTHROPIC_API_KEY is not set - Agent features will not work');
+    return '';
   }
-  return key || '';
+  // Strip UTF-8 BOM (0xFEFF) and whitespace — GCP Secret Manager sometimes stores them
+  return key.replace(/^﻿/, '').trim();
 }
 
 // API endpoints
