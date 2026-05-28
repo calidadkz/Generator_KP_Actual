@@ -454,30 +454,23 @@ export const ManagerCockpit: React.FC<ManagerCockpitProps> = ({ onBack }) => {
           isFilled ? 'bg-green-500' : isPending ? 'bg-amber-400' : 'bg-gray-300'
         }`} />
         <span className="text-[10px] text-gray-500 flex-shrink-0 w-[72px]">{slot.label}:</span>
-        {isFilled ? (
-          <button
-            className="text-[10px] font-bold text-green-700 bg-green-50 px-1.5 py-0.5 rounded flex-1 text-left truncate"
-            onClick={() => onChange(slot.key, '')}
-          >
-            {value}
-          </button>
-        ) : (
-          <div className="flex gap-1 flex-1">
-            <input
-              className="flex-1 text-[10px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:border-calidad-blue min-w-0"
-              placeholder="уточнить..."
-              value={value}
-              onChange={e => onChange(slot.key, e.target.value)}
-            />
-            <button
-              onClick={() => onTogglePending(slot.key)}
-              title="Ждём ответа"
-              className={`text-[9px] px-1 py-0.5 rounded flex-shrink-0 ${
-                isPending ? 'bg-amber-100 text-amber-600' : 'bg-gray-100 text-gray-400 hover:bg-amber-50'
-              }`}
-            >⏳</button>
-          </div>
-        )}
+        <input
+          className={`flex-1 text-[10px] border rounded px-1.5 py-0.5 focus:outline-none min-w-0 ${
+            isFilled
+              ? 'border-green-200 bg-green-50 text-green-700 font-bold focus:border-green-400'
+              : 'border-gray-200 focus:border-calidad-blue'
+          }`}
+          placeholder="уточнить..."
+          value={value}
+          onChange={e => onChange(slot.key, e.target.value)}
+        />
+        <button
+          onClick={() => onTogglePending(slot.key)}
+          title="Ждём ответа"
+          className={`text-[9px] px-1 py-0.5 rounded flex-shrink-0 ${
+            isPending ? 'bg-amber-100 text-amber-600' : 'bg-gray-100 text-gray-400 hover:bg-amber-50'
+          }`}
+        >⏳</button>
       </div>
     );
   };
