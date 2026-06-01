@@ -369,19 +369,27 @@ export async function agentChat(
     ? `${basePrompt}\n\n---\nДОПОЛНИТЕЛЬНЫЕ ИНСТРУКЦИИ ОТ РУКОВОДИТЕЛЯ:\n${customInstructions.trim()}`
     : basePrompt;
 
+  // Кэшируем системный промпт и инструменты — cache reads не идут в лимит 30K/мин
+  const toolsWithCache = AGENT_TOOLS.map((tool, i) =>
+    i === AGENT_TOOLS.length - 1
+      ? { ...tool, cache_control: { type: 'ephemeral' as const } }
+      : tool,
+  );
+
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
       'x-api-key': apiKey,
       'anthropic-version': '2023-06-01',
+      'anthropic-beta': 'prompt-caching-2024-07-31',
       'content-type': 'application/json',
     },
     body: JSON.stringify({
       model: 'claude-sonnet-4-6',
       max_tokens: 4096,
-      system: systemPrompt,
+      system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
       messages: anthropicMessages,
-      tools: AGENT_TOOLS,
+      tools: toolsWithCache,
     }),
   });
 
@@ -393,7 +401,7 @@ export async function agentChat(
   const data = (await response.json()) as {
     content?: AnthropicContent[];
     stop_reason?: string;
-    usage?: { input_tokens: number; output_tokens: number };
+    usage?: { input_tokens: number; output_tokens: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number };
   };
 
   const usage = data.usage
