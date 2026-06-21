@@ -5,9 +5,25 @@
       "Bash(git add *)",
       "Bash(git commit *)",
       "Bash(git push *)",
+      "Bash(git log *)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
       "Bash(timeout 120 gcloud run deploy calidad-generator --source . --region asia-east2 --allow-unauthenticated --set-secrets=GEMINI_API_KEY=GEMINI_API_KEY:latest --project gen-lang-client-0038297950)",
       "PowerShell(gcloud run deploy calidad-generator --source . --region asia-east2 --allow-unauthenticated --set-secrets=GEMINI_API_KEY=GEMINI_API_KEY:latest --project gen-lang-client-0038297950 2>&1)",
       "Bash(gcloud --version)"
+    ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File 'D:\\MyProjectCalidad\\Generator_KP\\Generator_KP_Actual\\.claude\\save-session.ps1'"
+          }
+        ]
+      }
     ]
   }
 }

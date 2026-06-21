@@ -31,10 +31,14 @@
             "id": "3bb8ed0054f87828",
             "type": "leaf",
             "state": {
-              "type": "graph",
-              "state": {},
-              "icon": "lucide-git-fork",
-              "title": "Граф"
+              "type": "markdown",
+              "state": {
+                "file": "CALIDAD_BOOK/modules/05_cockpit.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "05_cockpit"
             }
           }
         ]
@@ -199,13 +203,43 @@
       "bases:Создать новую базу": false
     }
   },
-  "active": "5a4425d5ff52565e",
+  "active": "3bb8ed0054f87828",
   "lastOpenFiles": [
-    "Current_Project_Map.md.tmp.11536.1777832059601",
-    "Current_Project_Map.md.tmp.8180.1777327691013",
-    "Current_Project_Map.md.tmp.8180.1777325271196",
-    "Current_Project_Map.md.tmp.8180.1777324585238",
+    "CALIDAD_BOOK/04_process_flows.md.tmp.5876.240f3ae3b344",
+    "CALIDAD_BOOK/modules/06_knowledge_library.md.tmp.5876.cafc92fcc304",
+    "CALIDAD_BOOK/INDEX.md.tmp.5876.5b221b22a938",
+    "CALIDAD_BOOK/INDEX.md.tmp.5876.be9979e08248",
+    "CALIDAD_BOOK/modules/19_bot_clone.md",
+    "CALIDAD_BOOK/modules/18_academy.md",
+    "CALIDAD_BOOK/modules/18_academy.md.tmp.5876.753ba3aa2cfb",
+    "CALIDAD_BOOK/modules/05_cockpit.md.tmp.5876.039eaa6e14b2",
+    "CALIDAD_BOOK/modules/15_client_portraits.md.tmp.5876.43bca2e4164b",
+    "CALIDAD_BOOK/modules/09_quality_control.md.tmp.5876.e74e55d4b6e0",
+    "CALIDAD_BOOK/modules/07_agent.md",
+    "CALIDAD_BOOK/modules/08_feedback_gear.md",
+    "CALIDAD_BOOK/modules/11_analytics.md.tmp.22680.63efe7f91d67",
+    "CALIDAD_BOOK/modules/05_cockpit.md.tmp.22680.cda3b1086d1a",
+    "CALIDAD_BOOK/modules/05_cockpit.md.tmp.22680.f23406f79f9c",
+    "CALIDAD_BOOK/04_process_flows.md",
+    "CALIDAD_BOOK/modules/04_contracts.md",
+    "CALIDAD_BOOK/03_ui_layout.md",
+    "CALIDAD_BOOK/modules/06_knowledge_library.md",
+    "CALIDAD_BOOK/modules/09_quality_control.md",
+    "CALIDAD_BOOK/modules/10_trainer.md",
+    "CALIDAD_BOOK/modules/11_analytics.md",
+    "CALIDAD_BOOK/modules/05_cockpit.md",
+    "CALIDAD_BOOK/modules/03_kp_generator.md",
+    "CALIDAD_BOOK/INDEX.md",
+    "CALIDAD_BOOK/02_roles_access.md",
+    "CALIDAD_BOOK/decisions/tech_stack.md",
+    "CALIDAD_BOOK/01_architecture.md",
+    "CALIDAD_BOOK/00_vision.md",
+    "создайте ссылку.md",
+    "CALIDAD_BOOK/decisions/data_architecture.md",
     "Добро пожаловать.md",
-    "Current_Project_Map.md"
+    "CALIDAD_BOOK/decisions/api_costs.md",
+    "Current_Project_Map.md",
+    "CALIDAD_BOOK/modules/17_competitor_ref.md",
+    "modules/05_cockpit.md"
   ]
 }

@@ -4,7 +4,30 @@
       "Bash(npm install:*)",
       "Bash(npx tsc:*)",
       "PowerShell(gcloud run deploy generator-kp --source . --region asia-east1 --project gen-lang-client-0038297950 --set-secrets \"GEMINI_API_KEY=GEMINI_API_KEY:8\" --allow-unauthenticated)",
-      "Bash(curl -s http://localhost:5173)"
+      "Bash(curl -s http://localhost:5173)",
+      "Bash(gcloud builds *)",
+      "Bash(gcloud config *)",
+      "Bash(Get-ChildItem -Path \"d:\\\\MyProjectCalidad\\\\Generator_KP\\\\Generator_KP_Actual\" -Directory)",
+      "Bash(Select-Object Name)",
+      "PowerShell(gcloud secrets add-iam-policy-binding GEMINI_API_KEY --member=\"serviceAccount:550172160790-compute@developer.gserviceaccount.com\" --role=\"roles/secretmanager.secretAccessor\" --project=gen-lang-client-0496465292)",
+      "PowerShell(gcloud secrets add-iam-policy-binding OPENAI_API_KEY --member=\"serviceAccount:550172160790-compute@developer.gserviceaccount.com\" --role=\"roles/secretmanager.secretAccessor\" --project=gen-lang-client-0496465292)",
+      "PowerShell(gcloud run deploy calidad-generator --source . --region asia-east2 --project gen-lang-client-0496465292 --allow-unauthenticated --set-secrets=GEMINI_API_KEY=GEMINI_API_KEY:latest --set-secrets=OPENAI_API_KEY=OPENAI_API_KEY:latest --memory=512Mi --cpu=1 --timeout=3600)",
+      "PowerShell(gcloud run logs read calidad-generator --region asia-east2 --project gen-lang-client-0496465292 --limit 50)",
+      "PowerShell(gcloud run services logs read calidad-generator --region us-central1 --project gen-lang-client-0496465292 --limit 30)",
+      "PowerShell(gcloud run services logs read calidad-generator --region us-central1 --project gen-lang-client-0496465292 --limit 20)",
+      "PowerShell(gcloud artifacts repositories create calidad --repository-format=docker --location=us-central1 --project=gen-lang-client-0496465292 --description=\"Calidad Generator Docker images\")",
+      "PowerShell(gcloud run deploy calidad-generator --source . --region us-central1 --project gen-lang-client-0496465292 --allow-unauthenticated --set-secrets=GEMINI_API_KEY=GEMINI_API_KEY:latest --set-secrets=OPENAI_API_KEY=OPENAI_API_KEY:latest --memory=512Mi --cpu=1 --timeout=3600)",
+      "PowerShell(gcloud services list --enabled --project=gen-lang-client-0496465292 --filter=\"name:cloudbuild OR name:run OR name:artifactregistry\" --format=\"table\\(name,state\\)\")",
+      "PowerShell(gcloud builds list --project=gen-lang-client-0496465292 --limit=5 --format=\"table\\(id,status,createTime,duration\\)\")",
+      "PowerShell(gcloud logging read 'resource.type=\"cloud_run_revision\" OR resource.type=\"build\"' --project=gen-lang-client-0496465292 --limit=10 --freshness=10m --format=\"value\\(timestamp,severity,textPayload\\)\" 2>&1)",
+      "PowerShell(gcloud logging read 'resource.type=\"build\"' --project=gen-lang-client-0496465292 --limit=50 --freshness=15m --format=\"value\\(textPayload\\)\" 2>&1)",
+      "PowerShell(gcloud run services describe calidad-generator --region us-central1 --project gen-lang-client-0496465292 --format=\"value\\(status.latestReadyRevisionName,status.url\\)\" 2>&1)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\torew\\\\.claude\\\\projects\\\\d--MyProjectCalidad-Generator-KP-Generator-KP_Actual\\\\memory\\\\\" -Force)",
+      "Read(//c/Users/torew/.claude/**)",
+      "Bash(git -C \"d:\\\\MyProjectCalidad\\\\Generator_KP\\\\Generator_KP_Actual\" log --oneline -10)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\torew\\.claude\\projects\\d--MyProjectCalidad-Generator-KP-Generator-KP_Actual\\memory"
     ]
   }
 }
