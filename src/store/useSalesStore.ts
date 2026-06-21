@@ -12,6 +12,7 @@ import {
   CleaningConfig,
   ClientPortrait,
   FeedbackNote,
+  KpBlock,
 } from '../types';
 import { deleteDialogueTexts, saveDialogueTexts } from '../lib/dialogueStorage';
 import { cloudSyncManager } from '../lib/cloudSyncManager';
@@ -229,6 +230,9 @@ interface SalesStore {
   // Модуль 08: Шестерёнка
   feedbackNotes: FeedbackNote[];
 
+  // Модуль 03: КП блоки (модульная система)
+  kpBlocks: KpBlock[];
+
   addMachineType: (t: MachineType) => void;
   updateMachineType: (id: string, patch: Partial<MachineType>) => void;
   deleteMachineType: (id: string) => void;
@@ -283,6 +287,13 @@ interface SalesStore {
   updateFeedbackNote: (id: string, patch: Partial<FeedbackNote>) => void;
   deleteFeedbackNote: (id: string) => void;
 
+  // Модуль 03: КП блоки
+  addKpBlock: (block: KpBlock) => void;
+  updateKpBlock: (id: string, patch: Partial<KpBlock>) => void;
+  deleteKpBlock: (id: string) => void;
+  setKpBlocks: (blocks: KpBlock[]) => void;
+  _loadKpBlocks: (blocks: KpBlock[]) => void; // Direct load without sync
+
   // Agent custom instructions
   agentCustomInstructions: string;
   setAgentCustomInstructions: (s: string) => void;
@@ -304,6 +315,7 @@ export const useSalesStore = create<SalesStore>()(
       cleaningConfig: defaultCleaningConfig,
       clientPortraits: [],
       feedbackNotes: [],
+      kpBlocks: [],
       agentCustomInstructions: '',
 
       addMachineType: (t) =>
@@ -489,6 +501,27 @@ export const useSalesStore = create<SalesStore>()(
         set((s) => ({ feedbackNotes: s.feedbackNotes.filter((n) => n.id !== id) }));
         deleteNoteFromCloud(id).catch(console.error);
       },
+
+      // КП блоки
+      addKpBlock: (block) => {
+        set((s) => ({ kpBlocks: [...s.kpBlocks, block] }));
+        cloudSyncManager.queueSync({ type: 'kp_blocks', data: block });
+      },
+      updateKpBlock: (id, patch) => {
+        set((s) => ({
+          kpBlocks: s.kpBlocks.map((b) => (b.id === id ? { ...b, ...patch } : b)),
+        }));
+        cloudSyncManager.queueSync({ type: 'kp_blocks', data: { id, ...patch } });
+      },
+      deleteKpBlock: (id) => {
+        set((s) => ({ kpBlocks: s.kpBlocks.filter((b) => b.id !== id) }));
+        cloudSyncManager.queueSync({ type: 'kp_blocks_delete', data: { id } });
+      },
+      setKpBlocks: (blocks) => {
+        set({ kpBlocks: blocks });
+        cloudSyncManager.queueSync({ type: 'kp_blocks_batch', data: blocks });
+      },
+      _loadKpBlocks: (blocks) => set({ kpBlocks: blocks }),
 
       setAgentCustomInstructions: (s) => set({ agentCustomInstructions: s }),
 

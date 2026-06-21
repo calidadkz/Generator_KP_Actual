@@ -356,3 +356,62 @@ export interface WordPressConfig {
   username: string;
   appPassword: string;
 }
+
+// ─── КП Блоки (модульная система) ──────────────────────────────────────────
+
+export interface KpBlockImage {
+  url: string;
+  caption?: string;
+  order: number;
+}
+
+export interface KpBlockChip {
+  icon: string;   // emoji или название иконки (SVG)
+  label: string;
+}
+
+export interface KpBlockBenefit {
+  icon: string;
+  title: string;
+  text: string;
+}
+
+export type KpBlockType = 'text' | 'gallery' | 'chips' | 'benefits';
+export type KpBlockCategory = 'introduction' | 'materials' | 'examples' | 'skills' | 'support' | 'social_proof' | 'cta';
+
+export interface KpBlock {
+  id: string;
+  type: KpBlockType;
+  title: string;
+  subtitle?: string;
+  description?: string;
+  category: KpBlockCategory;
+
+  // Контент (зависит от типа блока)
+  images?: KpBlockImage[];      // для gallery
+  chips?: KpBlockChip[];        // для chips
+  benefits?: KpBlockBenefit[]; // для benefits
+  content?: string;             // для text
+
+  // Фильтрация по портретам и станкам
+  portraits: string[];          // clientPortrait.id (например: ["beginners", "jewelers"])
+  equipments: string[];         // ["co2", "fiber", "marker"]
+  machineTypes?: string[];      // конкретные модели (опционально)
+
+  // Управление
+  visible: boolean;
+  order: number;
+
+  // Метаданные
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;           // userId руководителя
+}
+
+export interface KpGeneratorState {
+  blocks: KpBlock[];
+  selectedPortrait?: string;
+  selectedEquipment: string;   // "co2" | "fiber" | "marker"
+  clientName: string;
+  kpDate: string;
+}

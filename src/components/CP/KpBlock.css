@@ -1,0 +1,248 @@
+/* ─── КП Блоки: Единая система стилей ──────────────────────────────────── */
+
+/* Цветовая палитра CALIDAD */
+:root {
+  --calidad-primary: #0f3c7a;
+  --calidad-accent: #d9232a;
+  --calidad-highlight: #f97316;
+  --calidad-text-dark: #111111;
+  --calidad-text-muted: #9ca3af;
+  --calidad-bg-light: #f9fafb;
+  --calidad-border: #e5e7eb;
+  --calidad-blue-light: #f0f5ff;
+}
+
+/* ─── Общий контейнер блока ──────────────────────────────────────────────── */
+
+.kp-block {
+  margin-bottom: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ─── Заголовок блока ────────────────────────────────────────────────────── */
+
+.block-header {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 3px;
+}
+
+.block-title {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--calidad-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.block-title::before {
+  content: '';
+  display: block;
+  width: 4px;
+  height: 16px;
+  background: var(--calidad-primary);
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.block-subtitle {
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--calidad-text-muted);
+  margin: 0;
+  padding-left: 11px;
+}
+
+/* ─── Содержимое блока ───────────────────────────────────────────────────── */
+
+.block-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ─── TextBlock ──────────────────────────────────────────────────────────── */
+
+.text-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.text-content {
+  font-family: 'Inter', sans-serif;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--calidad-text-dark);
+}
+
+.text-content p {
+  margin: 0;
+  margin-bottom: 6px;
+}
+
+.text-content p:last-child {
+  margin-bottom: 0;
+}
+
+.text-description {
+  font-family: 'Inter', sans-serif;
+  font-size: 10.5px;
+  color: var(--calidad-text-muted);
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* ─── GalleryBlock ───────────────────────────────────────────────────────── */
+
+.gallery-block {
+  display: grid;
+  gap: 8px;
+}
+
+/* Grid 3×3 */
+.gallery-grid-3x3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+/* Grid 2×3 */
+.gallery-grid-2x3 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.gallery-item {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--calidad-bg-light);
+}
+
+.gallery-item img {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  object-fit: cover;
+  display: block;
+}
+
+.gallery-item figcaption {
+  font-family: 'Inter', sans-serif;
+  font-size: 9.5px;
+  color: var(--calidad-text-muted);
+  padding: 4px 6px;
+  text-align: center;
+  line-height: 1.4;
+}
+
+/* ─── ChipsBlock (Материалы) ─────────────────────────────────────────────── */
+
+.chips-block {
+  display: flex;
+  flex-direction: column;
+}
+
+.chips-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 4px;
+  padding: 6px 8px;
+  background: var(--calidad-blue-light);
+  border: 1px solid #c7d7f5;
+  border-radius: 5px;
+  flex: 1;
+  min-width: 70px;
+}
+
+.chip-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.chip-label {
+  font-family: 'Inter', sans-serif;
+  font-size: 9px;
+  font-weight: 600;
+  color: #1e3a6e;
+  line-height: 1.2;
+}
+
+/* ─── BenefitsBlock (Кейсы, карточки) ──────────────────────────────────── */
+
+.benefits-block {
+  display: flex;
+  flex-direction: column;
+}
+
+.benefits-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.benefit-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  background: var(--calidad-bg-light);
+  border: 1px solid var(--calidad-border);
+  border-radius: 8px;
+}
+
+.benefit-icon {
+  font-size: 24px;
+  line-height: 1;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.benefit-title {
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--calidad-primary);
+  margin: 0;
+}
+
+.benefit-text {
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  color: var(--calidad-text-dark);
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* ─── Print styles ──────────────────────────────────────────────────────── */
+
+@media print {
+  .kp-block {
+    page-break-inside: avoid;
+  }
+
+  .gallery-item img {
+    max-width: 100%;
+    height: auto;
+  }
+}
